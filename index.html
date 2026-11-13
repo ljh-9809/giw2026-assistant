@@ -419,7 +419,7 @@ async function ask(){
   box.value=''; say('me', q);
   const hits = retrieve(q, 30);
   const ctx = hits.map(h=>h.label).join('\n\n');
-  const ep = LS.get('endpoint',''), key = LS.get('apikey','');
+  const ep = LS.get('endpoint','') || (location.protocol.startsWith('http') ? '/api/ask' : ''), key = LS.get('apikey','');
   const sys = '너는 BIOINFO/GIW ISCB-Asia 2026 학회(2026년 11월 17-20일, 연세대학교) 안내 비서야. '+
     '아래 "학회 데이터"에만 근거해서 한국어로 간결하게 답해. 없는 정보는 지어내지 말고 모른다고 해. '+
     '세션은 날짜·시간·장소를, 포스터는 번호(Pxxx)를 꼭 같이 알려줘.';
@@ -428,10 +428,17 @@ async function ask(){
   try{
     let answer='';
     if (ep){
-      const r = await fetch(ep,{method:'POST',headers:{'content-type':'application/json'},
-        body:JSON.stringify({question:q, context:ctx, system:sys})});
-      const j = await r.json();
-      answer = j.answer || j.content?.[0]?.text || JSON.stringify(j).slice(0,500);
+      try {
+        const r = await fetch(ep,{method:'POST',headers:{'content-type':'application/json'},
+          body:JSON.stringify({question:q, context:ctx, system:sys})});
+        if (!r.ok && r.status===404) throw new Error('no-proxy');
+        const j = await r.json();
+        answer = j.answer || j.content?.[0]?.text || JSON.stringify(j).slice(0,500);
+      } catch(err) {
+        answer = hits.length ?
+          '(로컬 검색 결과 · AI 서버 연결 안 됨)\n\n'+hits.slice(0,12).map((h,i)=>(i+1)+'. '+h.label.split('\n')[0]).join('\n')
+          : '관련된 세션이나 포스터를 못 찾았어요.';
+      }
     } else if (key){
       const r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
         headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01',
