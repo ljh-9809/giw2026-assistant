@@ -136,11 +136,12 @@
   <!-- AI -->
   <section id="tab-ai" class="hide">
     <div class="chat" id="chat">
-      <p class="muted">예) "췌장암 관련 포스터 뭐 있어?" · "11/20 오전에 long-read 세션 어디서 해?" · "single-cell 하는 연세대 사람 찾아줘"</p>
+      <p class="muted">예) "췌장암 관련 포스터 뭐 있어?" · "그 중에 연세대 사람 거는?" · "11/20 오전엔 뭐 들을까?" — 앞 대화를 기억하니까 이어서 물어봐도 돼요.</p>
     </div>
     <div class="bar" style="margin-top:10px">
-      <input type="text" id="ask" placeholder="학회 프로그램·포스터에 대해 물어보세요">
+      <input type="text" id="ask" placeholder="편하게 물어보세요. 이어서 질문해도 돼요">
       <button class="btn" id="asksend">질문</button>
+      <button class="btn ghost" id="newchat">새 대화</button>
     </div>
     <details class="setup">
       <summary>AI 연결 설정</summary>
@@ -414,24 +415,40 @@ function say(role, text){
   d.innerHTML='<div class="role">'+(role==='me'?'나':'학회 비서')+'</div><div class="body"></div>';
   d.querySelector('.body').textContent = text; chat.appendChild(d); chat.scrollTop = chat.scrollHeight; return d;
 }
+const CHAT = [];           // API로 보내는 대화 기록
+function mdToHtml(t){
+  let h = esc(t);
+  h = h.replace(/^#{1,4}\s*(.*)$/gm,'<b>$1</b>');
+  h = h.replace(/\*\*([^*]+)\*\*/g,'<b>$1</b>');
+  h = h.replace(/(^|\s)(P\d{3})(?=[\s,.):]|$)/g,'$1<b>$2</b>');
+  return h;
+}
+function resetChat(){
+  CHAT.length = 0;
+  chat.innerHTML = '<p class="muted">예) "췌장암 관련 포스터 뭐 있어?" · "그 중에 연세대 사람 거는?" · "11/20 오전엔 뭐 들을까?" — 앞 대화를 기억하니까 이어서 물어봐도 돼요.</p>';
+}
 async function ask(){
   const box=document.getElementById('ask'); const q=box.value.trim(); if(!q) return;
   box.value=''; say('me', q);
-  const hits = retrieve(q, 30);
+  const hits = retrieve(q, 24);
   const ctx = hits.map(h=>h.label).join('\n\n');
   const DEFAULT_EP = location.hostname.endsWith('vercel.app') ? '/api/ask' : 'https://giw2026-assistant.vercel.app/api/ask';
   const ep = LS.get('endpoint','') || (location.protocol.startsWith('http') ? DEFAULT_EP : ''), key = LS.get('apikey','');
-  const sys = '너는 BIOINFO/GIW ISCB-Asia 2026 학회(2026년 11월 17-20일, 연세대학교) 안내 비서야. '+
-    '아래 "학회 데이터"에만 근거해서 한국어로 간결하게 답해. 없는 정보는 지어내지 말고 모른다고 해. '+
-    '세션은 날짜·시간·장소를, 포스터는 번호(Pxxx)를 꼭 같이 알려줘.';
-  const user = '학회 데이터:\n'+ctx+'\n\n질문: '+q;
-  const pending = say('bot','생각 중...');
+  const sys = '너는 BIOINFO/GIW ISCB-Asia 2026 학회(2026년 11월 17-20일, 연세대학교 백양누리)의 안내 비서야. '+
+    '참가자와 편하게 대화하듯 한국어로 답해. 매 질문마다 [관련 학회 데이터]가 붙는데, 사실은 그 데이터와 앞선 대화 내용에만 근거해. '+
+    '데이터에 없으면 모른다고 솔직히 말하고 추측하지 마. '+
+    '세션을 말할 땐 날짜·시간·장소를, 포스터는 번호(Pxxx)를 같이 알려줘. '+
+    '"그거", "그 중에", "아까 그거" 같은 말은 앞 대화에서 찾아서 이어서 답해. '+
+    '길게 늘어놓지 말고 필요한 만큼만, 목록은 짧게.';
+  const userMsg = (ctx ? '[관련 학회 데이터]\n'+ctx+'\n\n' : '')+'[질문] '+q;
+  const pending = say('bot','...');
   try{
     let answer='';
+    const outgoing = CHAT.concat([{ role:'user', content:userMsg }]).slice(-12);
     if (ep){
       try {
         const r = await fetch(ep,{method:'POST',headers:{'content-type':'application/json'},
-          body:JSON.stringify({question:q, context:ctx, system:sys})});
+          body:JSON.stringify({ messages: outgoing, system: sys, question: q, context: ctx })});
         if (!r.ok && r.status===404) throw new Error('no-proxy');
         const j = await r.json();
         answer = j.answer || j.content?.[0]?.text || JSON.stringify(j).slice(0,500);
@@ -444,8 +461,7 @@ async function ask(){
       const r = await fetch('https://api.anthropic.com/v1/messages',{method:'POST',
         headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01',
                  'anthropic-dangerous-direct-browser-access':'true'},
-        body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:1200,system:sys,
-          messages:[{role:'user',content:user}]})});
+        body:JSON.stringify({model:'claude-sonnet-4-5-20250929',max_tokens:1200,system:sys,messages:outgoing})});
       const j = await r.json();
       answer = j.content?.[0]?.text || (j.error?.message||'오류');
     } else {
@@ -453,7 +469,10 @@ async function ask(){
         '(로컬 검색 결과 · AI 연결 안 됨)\n\n'+hits.slice(0,12).map((h,i)=>(i+1)+'. '+h.label.split('\n')[0]).join('\n')
         : '관련된 세션이나 포스터를 못 찾았어요. 다른 키워드로 물어봐 주세요.';
     }
-    pending.querySelector('.body').textContent = answer;
+    CHAT.push({ role:'user', content:userMsg });
+    CHAT.push({ role:'assistant', content:answer });
+    while (CHAT.length > 12) CHAT.shift();
+    pending.querySelector('.body').innerHTML = mdToHtml(answer);
     if (hits.length){
       const links=document.createElement('div'); links.className='muted'; links.style.marginTop='6px';
       links.innerHTML = '근거: '+hits.slice(0,5).map(h=>'<a href="'+h.url+'" target="_blank" rel="noopener">'+
@@ -462,6 +481,7 @@ async function ask(){
     }
   }catch(e){ pending.querySelector('.body').textContent = '오류: '+e; }
 }
+document.getElementById('newchat').onclick = resetChat;
 document.getElementById('asksend').onclick = ask;
 document.getElementById('ask').addEventListener('keydown', e=>{ if(e.key==='Enter') ask(); });
 
