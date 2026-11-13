@@ -5,6 +5,7 @@ const MODEL = 'claude-sonnet-4-5-20250929';
 const MAX_TOKENS = 1000;
 const MAX_QUESTION = 500;
 const MAX_CONTEXT = 24000;
+const MAX_TURNS = 12;
 const RATE_LIMIT = 10;    // IP당 분당
 const DAILY_CAP = 1500;   // 전체 하루 (비용 안전장치)
 
@@ -33,7 +34,14 @@ export default async function handler(req, res) {
   const context = String(body.context || '').slice(0, MAX_CONTEXT);
   const system = String(body.system || '') ||
     '너는 BIOINFO/GIW ISCB-Asia 2026 학회(2026년 11월 17-20일, 연세대학교) 안내 비서야. 주어진 학회 데이터에만 근거해 한국어로 간결히 답하고, 모르면 모른다고 해.';
-  if (!question) return res.status(400).json({ answer: '질문이 비었어요.' });
+  const rawMsgs = Array.isArray(body.messages) ? body.messages : null;
+  const messages = (rawMsgs && rawMsgs.length)
+    ? rawMsgs.slice(-12)
+        .filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content)
+        .map(m => ({ role: m.role, content: String(m.content).slice(0, MAX_CONTEXT) }))
+    : [{ role: 'user', content: `학회 데이터:\n${context}\n\n질문: ${question}` }];
+  if (!messages.length || messages[0].role !== 'user')
+    return res.status(400).json({ answer: '질문이 비었어요.' });
 
   try {
     const r = await fetch('https://api.anthropic.com/v1/messages', {
@@ -44,8 +52,7 @@ export default async function handler(req, res) {
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: MODEL, max_tokens: MAX_TOKENS, system,
-        messages: [{ role: 'user', content: `학회 데이터:\n${context}\n\n질문: ${question}` }],
+        model: MODEL, max_tokens: MAX_TOKENS, system, messages,
       }),
     });
     const j = await r.json();
