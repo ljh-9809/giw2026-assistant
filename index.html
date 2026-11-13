@@ -373,8 +373,32 @@ document.getElementById('apikey').value = LS.get('apikey','') || '';
 document.getElementById('epsave').onclick = ()=>{ LS.set('endpoint', document.getElementById('ep').value.trim()); alert('저장됨'); };
 document.getElementById('keysave').onclick = ()=>{ LS.set('apikey', document.getElementById('apikey').value.trim()); alert('저장됨 (이 브라우저에만)'); };
 
+
+const KO = {'췌장암':'pancreatic','췌장':'pancreatic','간전이':'liver metastasis','전이':'metastasis','유방암':'breast',
+ '난소암':'ovarian','대장암':'colorectal','위암':'gastric','폐암':'lung','간암':'hepatocellular','혈액암':'leukemia',
+ '암':'cancer','종양':'tumor','미세환경':'microenvironment','단일세포':'single-cell','싱글셀':'single-cell',
+ '공간전사체':'spatial','공간':'spatial','전사체':'transcriptome','유전체':'genome','후성유전':'epigenom',
+ '스플라이싱':'splicing','접합':'splicing','아이소폼':'isoform','롱리드':'long-read','롱리드시퀀싱':'long-read',
+ '나노포어':'nanopore','단백질':'protein','구조':'structure','약물':'drug','신약':'drug','미생물':'microbiome',
+ '마이크로바이옴':'microbiome','메타지놈':'metagenom','면역':'immun','딥러닝':'deep learning','머신러닝':'machine learning',
+ '인공지능':'AI','기반모델':'foundation model','파운데이션':'foundation model','에이전트':'agent','멀티오믹스':'multi-omics',
+ '다중오믹스':'multi-omics','임상':'clinical','바이오마커':'biomarker','돌연변이':'mutation','변이':'variant',
+ '연세':'Yonsei','서울대':'Seoul National','카이스트':'KAIST','고려대':'Korea University','포스텍':'Pohang',
+ '지스트':'Gwangju','성균관':'Sungkyunkwan','한양':'Hanyang','아산':'Asan','삼성':'Samsung'};
+const KO_STOP = /^(뭐|뭔|무슨|어디|어디서|언제|누가|누구|있어|있나|있는|관련|추천|알려줘|해줘|포스터|세션|발표|학회|좀|그|이|저|거|것|나|내|은|는|이|가|을|를|에|의|와|과|도|만|에서|으로|로)$/;
+function expand(q){
+  const raw = q.toLowerCase().match(/[a-z0-9가-힣\-]+/g)||[];
+  const out = [];
+  raw.forEach(w=>{
+    if (/[가-힣]/.test(w)) {
+      Object.keys(KO).forEach(k=>{ if (w.includes(k)) out.push(KO[k].toLowerCase()); });
+      if (!KO_STOP.test(w) && w.length>1) out.push(w);
+    } else if (w.length>1) out.push(w);
+  });
+  return Array.from(new Set(out));
+}
 function retrieve(q, n){
-  const terms = q.toLowerCase().match(/[a-z0-9가-힣\-]+/g)||[];
+  const terms = expand(q);
   const score = txt => { const t=txt.toLowerCase(); let s=0; terms.forEach(k=>{ if(k.length>1 && t.includes(k)) s += HEAVY.test(k)?3:1; }); return s; };
   const items = [];
   S.filter(s=>!s.isPoster).forEach(s=>{
