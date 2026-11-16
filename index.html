@@ -303,13 +303,23 @@ function termScore(text, terms){
   return sc;
 }
 function hitsOf(text, terms){ return terms.filter(function(k){ return k && hasTerm(text,k); }); }
+function nameBonus(text, terms){
+  var lat = terms.filter(function(k){ return /^[a-z][a-z\-]{2,}$/i.test(k); });
+  if (lat.length < 2) return 0;
+  var low = text.toLowerCase(), hit = 0;
+  lat.forEach(function(k){ if (low.indexOf(k.toLowerCase()) >= 0) hit++; });
+  return hit >= 2 ? 10 : 0;
+}
 function scoreSession(s, terms){
-  var sc = termScore(sTitleText(s), terms)*3 + termScore(sTalkTitles(s), terms)*2 + termScore(sPeople(s), terms);
+  var people = sPeople(s);
+  var sc = termScore(sTitleText(s), terms)*3 + termScore(sTalkTitles(s), terms)*2 + termScore(people, terms)*2;
+  sc += s.talks.reduce(function(m,t){ return Math.max(m, nameBonus(t.speaker||'', terms)); }, 0);
   if (VENDOR.test(s.track+' '+s.title)) sc = sc*0.4;
   return sc;
 }
 function scorePoster(p, terms){
-  return termScore(p.title, terms)*3 + termScore(p.authors.join(' ')+' '+p.affils.join(' '), terms);
+  var who = p.authors.join(' ')+' '+p.affils.join(' ');
+  return termScore(p.title, terms)*3 + termScore(who, terms) + nameBonus(p.authors.join(' '), terms);
 }
 function dayLabel(d){ var m = d.slice(5,7).replace(/^0/,''), dd = d.slice(8,10).replace(/^0/,'');
   return m+'월 '+dd+'일 '+(DOW[d]||''); }
@@ -504,7 +514,7 @@ document.getElementById('setsave').onclick = function(){
 /* ---------- AI 질문 ---------- */
 var KO = {'췌장암':'pancreatic','췌장':'pancreatic','간전이':'liver metastasis','전이':'metastasis','유방암':'breast',
  '난소암':'ovarian','대장암':'colorectal','위암':'gastric','폐암':'lung','간암':'hepatocellular','백혈병':'leukemia',
- '암':'cancer','종양':'tumor','미세환경':'microenvironment','단일세포':'single-cell','싱글셀':'single-cell',
+ '노화':'aging','고령':'aging','조기발병':'early onset','암':'cancer','종양':'tumor','미세환경':'microenvironment','단일세포':'single-cell','싱글셀':'single-cell',
  '공간전사체':'spatial','공간':'spatial','전사체':'transcriptome','유전체':'genome','후성유전':'epigenom',
  '스플라이싱':'splicing','접합':'splicing','아이소폼':'isoform','롱리드':'long-read','나노포어':'nanopore',
  '단백질':'protein','구조':'structure','약물':'drug','신약':'drug','미생물':'microbiome',
@@ -672,7 +682,7 @@ document.getElementById('ask').addEventListener('keydown', function(e){
     document.getElementById('askform').dispatchEvent(new Event('submit', { cancelable:true })); }
 });
 document.getElementById('newchat').onclick = function(){ CHAT.length = 0; chat.innerHTML = ''; document.getElementById('ask').focus(); };
-var EXAMPLES = ['오늘 뭐 들으면 좋을까','췌장암 포스터 찾아줘','11월 18일 오후 발표 알려줘','내 포스터 시간이 언제야','연세대 사람 발표는 뭐가 있어','long-read 관련 세션 알려줘'];
+var EXAMPLES = ['11월 18일 오후 발표 알려줘','노화랑 암 관련 연구 뭐 있어','single-cell 포스터 찾아줘','Jong Bhak 발표 언제야','내일 오전엔 뭐 들을까','대장암 관련된 거 있어'];
 document.getElementById('examples').innerHTML = EXAMPLES.map(function(x){
   return '<button class="btn btn--mini" type="button" data-ex="'+esc(x)+'">'+esc(x)+'</button>'; }).join('');
 document.getElementById('examples').addEventListener('click', function(e){
