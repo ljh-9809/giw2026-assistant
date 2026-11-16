@@ -27,7 +27,7 @@
   --tracking-display:-0.02em; --display-weight:600;
   --space-xs:4px; --space-sm:8px; --space-md:14px; --space-lg:22px; --space-xl:36px; --space-2xl:56px;
   --text-sm:14px; --text-base:17px; --text-lg:20px; --text-xl:26px; --text-display:38px;
-  --measure:74ch; --wrap:1180px;
+  --measure:70ch; --wrap:1060px;
 }
 *{box-sizing:border-box}
 html,body{overflow-x:clip;max-width:100%}
@@ -43,7 +43,8 @@ p{margin:var(--space-sm) 0;max-width:var(--measure)}
 a{color:var(--color-ink);text-decoration:underline;text-decoration-color:var(--color-accent);text-underline-offset:0.15em}
 a:hover{text-decoration-thickness:2px}
 :focus-visible{outline:2px solid var(--color-focus);outline-offset:2px;transition:none}
-.wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--space-lg)}
+.wrap{max-width:var(--wrap);margin:0 auto;padding:0 var(--space-xl)}
+@media (min-width:1100px){ .wrap{padding:0 56px} }
 .num{font-family:var(--font-outlier);font-variant-numeric:tabular-nums}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 
@@ -102,6 +103,18 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
 .answer .caret{display:inline-block;width:7px;height:1em;vertical-align:-2px;
   background:var(--color-accent);margin-left:2px;animation:blink 1s infinite}
+.tagline{max-width:34ch}
+@media (min-width:821px){ .tagline{max-width:52ch} }
+.qrhint{display:none}
+@media (min-width:821px){
+  .qrhint{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:var(--space-lg);align-items:center;
+    background:var(--color-sheet);border-top:var(--rule-bar) solid var(--color-ink);
+    padding:var(--space-md) var(--space-lg);margin-bottom:var(--space-lg)}
+  .qrhint h3{font-size:var(--text-base);margin-bottom:2px}
+  .qrhint p{margin:0;font-size:var(--text-sm)}
+  .qrhint img{display:block;background:var(--color-sheet)}
+  .qrhint.hide{display:none}
+}
 .histbar{display:flex;align-items:center;gap:var(--space-md);margin-bottom:var(--space-md)}
 #histlist{border-top:var(--rule-bar) solid var(--color-rule-2);margin-bottom:var(--space-lg)}
 .histrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-sm);align-items:center;
@@ -196,6 +209,9 @@ footer p{margin:0;font-size:var(--text-sm)}
 }
 @media (min-width:821px){
   .actions{display:flex;gap:var(--space-sm);align-items:center}
+  #view-ai{max-width:860px}
+  .turn h3{max-width:70%}
+  table.refs td.pick,table.list td.pick{width:90px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
 </style>
@@ -207,7 +223,7 @@ footer p{margin:0;font-size:var(--text-sm)}
     <div class="mast-top">
       <div>
         <h1>GIW 2026 학회 비서</h1>
-        <p class="lede" style="margin-top:var(--space-sm);max-width:34ch">일정은 제가 챙기겠습니다. 발표도 포스터도 한국어로 물어보세요.</p>
+        <p class="lede tagline" style="margin-top:var(--space-sm)">일정은 제가 챙기겠습니다. 발표도 포스터도 한국어로 물어보세요.</p>
       </div>
       <table class="facts">
         <tbody>
@@ -242,6 +258,14 @@ footer p{margin:0;font-size:var(--text-sm)}
 <noscript><p>이 도구는 자바스크립트로 프로그램 데이터를 그립니다. 스크립트를 끈 상태라면 공식 프로그램을 직접 보세요: <a href="https://virtual.oxfordabstracts.com/event/77416/program">virtual.oxfordabstracts.com/event/77416/program</a></p></noscript>
 
 <section id="view-ai" class="view">
+  <aside class="qrhint" id="qrhint">
+    <img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAUAAAAFAAQMAAAD3XjfpAAAABlBMVEX///8AAABVwtN+AAAACXBIWXMAAA7EAAAOxAGVKw4bAAAB0klEQVRoge2au63DMAxFabhwmREyikd7Gc2jeASXKYww4lcWXgaggctKkI6qK5IiJeKwN6k9PkQLy+jvIFpzmQCWBXcD1gY+28Qx2cKpe9bYDrAyOLdpnRqGTWsfNnsBvAkoU6LswnoCHgDvB57mnBJxZ90D8BagLQboSfN5WtL8GZoB1gLDLOK+Hhl8dZjLAMuCF0t3pXTi3wawFGhTqnX4aETcrvULYHGw5UTeRE/bs5FdXY8utGdXgBVBXbX0aKtTyE6y3W+xRADLglFnyFCsgSL7U8Z5oRXZAVYFhzrDkmYLs6k19bISYFHQGjbqmBZxP9YDmLMpp4eBARYGLWkyZ+Ev1iOueK5pDbAqaJly69VH5E+2q+tOGZoBlgQlJ9rU4K70T2uAVcHQ2qfMc9WJabKr65zNVIBlQb5EXM2UJnAHQ2uARUG1JcHNCxGrPsSyTAFYGFw94sa3DLv3iO3a3AFYFrzYpR2Q+TNkB1gX5LA3RROcFu8BDI/+AMuCu2m7+msiDdVHngAGWBgcPtl49aEPVH4IMjQDvAHoq+G5nK3xgwDeA+T+ICwdHf97CrA6mBE3ewDxycbbOOdYfQCsBobFq1S+Y8TPfU+lAO8OfgEVlZ5pkrYhUwAAAABJRU5ErkJggg==" alt="휴대폰으로 이 페이지를 여는 QR 코드" width="104" height="104">
+    <div>
+      <h3>휴대폰에서 쓰기 좋게 만들었습니다</h3>
+      <p class="muted">학회장에서는 휴대폰이 편합니다. 카메라로 이 코드를 찍으면 같은 화면이 열립니다. 구글 로그인을 하면 담은 즐겨찾기도 그대로 따라옵니다.</p>
+    </div>
+    <button class="btn btn--mini" type="button" id="qrclose">닫기</button>
+  </aside>
   <div class="histbar">
     <button class="btn btn--mini" type="button" id="histbtn">채팅 목록</button>
     <span class="muted" id="histnow"></span>
@@ -986,6 +1010,12 @@ function openChat(id){
   paintHistNow();
   window.scrollTo({ top: 0 });
 }
+var qrBox = document.getElementById('qrhint');
+if (LS.raw('qrclosed', 0)) qrBox.classList.add('hide');
+document.getElementById('qrclose').onclick = function(){
+  qrBox.classList.add('hide');
+  try{ localStorage.setItem('giw26_qrclosed', '1'); }catch(e){}
+};
 document.getElementById('histbtn').onclick = function(){
   var box = document.getElementById('histlist');
   var show = box.classList.contains('hide');
