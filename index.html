@@ -130,19 +130,6 @@ mark{background:transparent;color:var(--color-ink);box-shadow:inset 0 -0.42em 0 
 .filters{display:flex;flex-wrap:wrap;gap:var(--space-md);align-items:end;margin-top:var(--space-md)}
 .filters > div{flex:1 1 180px;min-width:0}
 .count{font-family:var(--font-outlier);font-size:var(--text-sm);color:var(--color-muted);margin-top:var(--space-sm)}
-.helpbtn{margin-left:auto;align-self:center;background:transparent;border:var(--rule-hair) solid var(--color-ink);
-  border-radius:var(--radius-pill);font:500 var(--text-sm)/1 var(--font-display);color:var(--color-ink);
-  padding:var(--space-sm) var(--space-md);cursor:pointer;white-space:nowrap}
-.helpbtn:hover{background:var(--color-paper-2)}
-.spot{outline:2px solid var(--color-accent);outline-offset:4px}
-body.tourmode .composer{position:static}
-.tour{position:fixed;left:0;right:0;bottom:0;z-index:20;background:var(--color-sheet);
-  border-top:var(--rule-bar) solid var(--color-ink)}
-.tour-inner{padding-top:var(--space-md);padding-bottom:calc(var(--space-md) + env(safe-area-inset-bottom))}
-.tour-step{font-size:13px;color:var(--color-muted);margin:0 0 2px}
-.tour h3{font-size:var(--text-lg);margin-bottom:4px}
-.tour p{margin:0;max-width:62ch}
-.tour-actions{display:flex;justify-content:space-between;gap:var(--space-sm);margin-top:var(--space-md)}
 footer{border-top:var(--rule-hair) solid var(--color-rule);margin-top:var(--space-xl);padding:var(--space-md) 0 var(--space-lg)}
 footer p{margin:0;font-size:var(--text-sm)}
 @media (max-width:820px){
@@ -157,7 +144,6 @@ footer p{margin:0;font-size:var(--text-sm)}
     border-bottom:var(--rule-bar) solid var(--color-rule-2)}
   nav.views::-webkit-scrollbar{display:none}
   nav.views button{white-space:nowrap;padding:12px 10px;margin-bottom:-2px;font-size:16px}
-  .helpbtn{padding:7px 10px;font-size:13px}
   main.wrap{padding-top:22px}
   h2{margin-bottom:4px}
   .sheet{padding:16px}
@@ -220,7 +206,6 @@ footer p{margin:0;font-size:var(--text-sm)}
       <button type="button" role="tab" data-view="rec" aria-selected="false">추천</button>
       <button type="button" role="tab" data-view="mine" aria-selected="false">즐겨찾기</button>
       <button type="button" role="tab" data-view="set" aria-selected="false">설정</button>
-      <button type="button" id="tourbtn" class="helpbtn">사용법</button>
     </nav>
   </div>
 </header>
@@ -309,17 +294,6 @@ footer p{margin:0;font-size:var(--text-sm)}
 </section>
 </main>
 
-<div id="tour" class="tour hide" role="dialog" aria-modal="false" aria-labelledby="tourtitle">
-  <div class="wrap tour-inner">
-    <p class="tour-step num" id="tourstep"></p>
-    <h3 id="tourtitle"></h3>
-    <p id="tourbody"></p>
-    <div class="tour-actions">
-      <button class="btn" type="button" id="tourskip">그만 보기</button>
-      <button class="btn btn--primary" type="button" id="tournext">다음</button>
-    </div>
-  </div>
-</div>
 
 <footer class="wrap">
   <p class="muted">Made by CGI Lab. 일정은 <a href="https://virtual.oxfordabstracts.com/event/77416/program">공식 프로그램</a>에서 한 번 더 확인하세요.</p>
@@ -967,61 +941,6 @@ window.gsiReady = function(){
   renderGbtn();
 };
 if (window.google && google.accounts) window.gsiReady();
-
-/* ---------- 사용법 안내 ---------- */
-var TOUR = [
-  { view:'ai', sel:'#askform', title:'여기에 물어보세요',
-    body:'한국어로 그냥 물으면 됩니다. 예를 들어 "11월 18일 오후 발표 알려줘", "췌장암 포스터 찾아줘". 답하는 동안 묻기 버튼은 멈춤으로 바뀌고, 누르면 중간에 끊을 수 있어요.' },
-  { view:'ai', sel:'#examples', title:'앞 질문을 기억합니다',
-    body:'답을 받은 뒤 "그 중에 연세대 거는?" 처럼 이어서 물어도 됩니다. 처음부터 다시 시작하려면 새 대화를 누르세요.' },
-  { view:'prog', sel:'#view-prog .filters', title:'프로그램은 날짜로 거릅니다',
-    body:'날짜와 분류를 고르거나 제목, 발표자, 소속으로 검색할 수 있어요. 포스터 탭도 같은 방식입니다.' },
-  { view:'prog', sel:'#view-prog [data-pick]', title:'담기를 누르면 즐겨찾기에 들어갑니다',
-    body:'관심 있는 세션이나 포스터에서 담기를 누르면 즐겨찾기 탭에 학회 일정 순서대로 쌓입니다. 한 번 더 누르면 빠집니다.' },
-  { view:'mine', sel:'#view-mine .examples', title:'즐겨찾기는 이 브라우저에 저장됩니다',
-    body:'서버로 보내지 않기 때문에 다른 기기에서는 보이지 않아요. 옮기려면 링크 복사를 눌러 나온 주소를 그 기기에서 열면 됩니다. 캘린더 파일을 받으면 휴대폰 일정에 그대로 들어갑니다.' },
-  { view:'set', sel:'#view-set .filters', title:'내 포스터 번호를 넣어두세요',
-    body:'설정에 번호를 넣으면 목록에서 내 포스터 표시가 붙고, "내 포스터 언제야" 같은 질문에도 답할 수 있어요.' }
-];
-var tourAt = -1, tourSpot = null;
-function tourShow(i){
-  if (tourSpot) { tourSpot.classList.remove('spot'); tourSpot = null; }
-  if (i < 0 || i >= TOUR.length) { tourEnd(); return; }
-  tourAt = i;
-  var s = TOUR[i];
-  var tabBtn = document.querySelector('#views button[data-view="'+s.view+'"]');
-  if (tabBtn && tabBtn.getAttribute('aria-selected') !== 'true') tabBtn.click();
-  var box = document.getElementById('tour');
-  box.classList.remove('hide');
-  document.getElementById('tourstep').textContent = (i+1) + ' / ' + TOUR.length;
-  document.getElementById('tourtitle').textContent = s.title;
-  document.getElementById('tourbody').textContent = s.body;
-  document.getElementById('tournext').textContent = (i === TOUR.length-1) ? '시작하기' : '다음';
-  document.body.classList.add('tourmode');
-  var tourH = box.offsetHeight;
-  document.body.style.paddingBottom = (tourH + 16) + 'px';
-  var el = document.querySelector(s.sel);
-  if (el){
-    tourSpot = el; el.classList.add('spot');
-    var rect = el.getBoundingClientRect();
-    var avail = window.innerHeight - tourH;
-    var offset = Math.max(16, (avail - rect.height) / 2);
-    window.scrollTo({ top: Math.max(0, rect.top + window.scrollY - offset), behavior:'smooth' });
-  }
-}
-function tourEnd(){
-  if (tourSpot) { tourSpot.classList.remove('spot'); tourSpot = null; }
-  document.getElementById('tour').classList.add('hide');
-  document.body.classList.remove('tourmode');
-  document.body.style.paddingBottom = '';
-  LS.set('tour_done', 1);
-  tourAt = -1;
-}
-document.getElementById('tournext').onclick = function(){ tourShow(tourAt + 1); };
-document.getElementById('tourskip').onclick = tourEnd;
-document.getElementById('tourbtn').onclick = function(){ tourShow(0); };
-document.addEventListener('keydown', function(e){ if (e.key === 'Escape' && tourAt >= 0) tourEnd(); });
-if (!LS.get('tour_done', 0)) setTimeout(function(){ tourShow(0); }, 700);
 
 /* ---------- 이름과 담은 개수 ---------- */
 function paintOwner(){
