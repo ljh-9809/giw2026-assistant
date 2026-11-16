@@ -929,7 +929,8 @@ function syncPush(quiet){
       body: JSON.stringify({ token: TOK, marks: marks }) })
       .then(function(r){
         if (r.ok) setSync(quiet ? '기기 간 동기화 중입니다.' : '저장했습니다. 다른 기기에서도 같은 목록이 보입니다.');
-        else setSync('로그인이 만료되어 저장하지 못했습니다. 다시 로그인해주세요.');
+        else if (r.status === 401) setSync('로그인이 만료되어 저장하지 못했습니다. 다시 로그인해주세요.');
+        else setSync('서버에 저장하지 못했습니다. 담은 내용은 이 브라우저에 남아 있습니다.');
       })
       .catch(function(){ setSync('동기화 서버에 연결하지 못했습니다.'); });
   }, 700);
