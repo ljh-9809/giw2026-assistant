@@ -285,7 +285,7 @@ footer p{margin:0;font-size:var(--text-sm)}
 <section id="view-mine" class="view hide">
   <h2>즐겨찾기</h2>
   <p class="muted" id="mineowner">담기를 누른 세션과 포스터를 학회 일정 순서대로 보여줍니다.</p>
-  <p class="muted">이 목록은 지금 쓰는 브라우저에만 저장됩니다. 서버로 보내지 않으니 브라우저 데이터를 지우거나 시크릿 창을 닫으면 함께 사라집니다. 다른 기기로 옮기려면 아래 링크 복사를 누르고 그 주소를 그 기기에서 열면 되는데, 그 링크를 받은 사람은 누구나 같은 목록을 볼 수 있습니다.</p>
+  <p class="muted" id="minestore"></p>
   <p class="syncnote" id="syncnote"></p>
   <div class="examples">
     <button class="btn" id="ics" type="button">캘린더 파일 내려받기</button>
@@ -900,7 +900,15 @@ try { TOK = localStorage.getItem('giw26_tok') || null; } catch(e){}
 var FAVS_EP = location.hostname.indexOf('vercel.app') >= 0 ? '/api/favs' : 'https://giw2026-assistant.vercel.app/api/favs';
 var pushTimer = null;
 function setSync(msg){ var n = document.getElementById('syncnote'); if (n) n.textContent = msg || ''; }
+function paintStoreNote(){
+  var p = document.getElementById('minestore');
+  if (!p) return;
+  p.textContent = ACC
+    ? '구글 계정에 저장되어 휴대폰과 노트북 어디서 로그인해도 같은 목록이 보입니다. 담거나 뺄 때마다 바로 반영됩니다.'
+    : '지금은 이 브라우저에만 저장됩니다. 브라우저 데이터를 지우면 함께 사라지고, 다른 기기에서는 보이지 않습니다. 설정 탭에서 구글 로그인을 하면 기기끼리 같아집니다.';
+}
 function syncState(){
+  paintStoreNote();
   if (!ACC) { setSync('로그인하면 휴대폰과 노트북에서 같은 즐겨찾기를 봅니다. 지금은 이 브라우저에만 저장됩니다.'); return; }
   setSync('구글 계정으로 기기 간 동기화 중입니다.');
 }
