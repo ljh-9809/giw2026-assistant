@@ -194,6 +194,7 @@ footer p{margin:0;font-size:var(--text-sm)}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
 </style>
+<script src="https://accounts.google.com/gsi/client" async defer onload="window.gsiReady&&window.gsiReady()"></script>
 </head>
 <body>
 <header class="mast">
@@ -205,6 +206,7 @@ footer p{margin:0;font-size:var(--text-sm)}
       </div>
       <table class="facts">
         <tbody>
+          <tr id="acctrow" class="hide"><th scope="row">사용자</th><td><span id="acctname"></span> <button type="button" class="btn btn--mini" id="signout">로그아웃</button></td></tr>
           <tr><th scope="row">학회</th><td>BIOINFO/GIW ISCB-Asia 2026</td></tr>
           <tr><th scope="row">기간</th><td class="num">2026-11-17 ~ 11-20</td></tr>
           <tr><th scope="row">장소</th><td>연세대학교, 서울</td></tr>
@@ -294,6 +296,9 @@ footer p{margin:0;font-size:var(--text-sm)}
 
 <section id="view-set" class="view hide">
   <h2>설정</h2>
+  <h3 class="daygrp" style="margin-top:0">계정</h3>
+  <p class="muted" id="acctnote">구글 계정으로 로그인하면 담은 목록이 내 계정 이름으로 따로 보관됩니다. 한 컴퓨터를 여러 사람이 써도 서로 섞이지 않습니다. 목록 자체는 여전히 이 브라우저에만 저장되고, 구글에는 아무것도 보내지 않습니다.</p>
+  <div id="gbtn" style="margin:10px 0 18px"></div>
   <p class="muted">여기 넣은 값과 담은 목록은 지금 쓰는 브라우저에만 저장됩니다. 다른 사람과 섞이지 않고, 서버로 보내지도 않습니다.</p>
   <div class="filters">
     <div><label for="myname">내 이름</label><input type="text" id="myname" placeholder="예) 임정혁"></div>
@@ -336,9 +341,14 @@ var POSTER_WHEN = '11월 18일 17:00, 11월 19일 16:30, The Commons Lobby';
 
 
 /* ---------- storage ---------- */
+var USERKEYS = ['marks','mynum','myname','kw'];
+var ACC = null;
+try { ACC = JSON.parse(localStorage.getItem('giw26_acct') || 'null'); } catch(e){ ACC = null; }
+function nsKey(k){ return 'giw26_' + (ACC && USERKEYS.indexOf(k) >= 0 ? ACC.sub + '_' : '') + k; }
 var LS = {
-  get: function(k,d){ try{ var v = JSON.parse(localStorage.getItem('giw26_'+k)); return v===null||v===undefined?d:v; }catch(e){ return d; } },
-  set: function(k,v){ try{ localStorage.setItem('giw26_'+k, JSON.stringify(v)); }catch(e){} }
+  get: function(k,d){ try{ var v = JSON.parse(localStorage.getItem(nsKey(k))); return v===null||v===undefined?d:v; }catch(e){ return d; } },
+  set: function(k,v){ try{ localStorage.setItem(nsKey(k), JSON.stringify(v)); }catch(e){} },
+  raw: function(k,d){ try{ var v = JSON.parse(localStorage.getItem('giw26_'+k)); return v===null||v===undefined?d:v; }catch(e){ return d; } }
 };
 var marks = LS.get('marks', []);
 var hash = new URLSearchParams(location.hash.slice(1));
@@ -896,6 +906,74 @@ document.getElementById('examples').addEventListener('click', function(e){
 });
 
 
+
+/* ---------- 구글 로그인 ---------- */
+var CLIENT_ID = '630188203588-uhqak5l4ijnppgivhcur2ssmt4j73f34.apps.googleusercontent.com';
+function parseJwt(t){
+  try{
+    var b = t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');
+    var json = decodeURIComponent(atob(b).split('').map(function(c){
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2); }).join(''));
+    return JSON.parse(json);
+  }catch(e){ return null; }
+}
+function paintAcct(){
+  var row = document.getElementById('acctrow');
+  var note = document.getElementById('acctnote');
+  var gbtn = document.getElementById('gbtn');
+  if (ACC){
+    row.classList.remove('hide');
+    document.getElementById('acctname').textContent = ACC.name + ' 님';
+    note.textContent = ACC.name + ' (' + ACC.email + ') 으로 로그인했습니다. 담은 목록은 이 계정 이름으로 이 브라우저에 보관됩니다.';
+    if (gbtn) gbtn.innerHTML = '';
+  } else {
+    row.classList.add('hide');
+    note.textContent = '구글 계정으로 로그인하면 담은 목록이 내 계정 이름으로 따로 보관됩니다. 한 컴퓨터를 여러 사람이 써도 서로 섞이지 않습니다. 목록 자체는 여전히 이 브라우저에만 저장되고, 구글에는 아무것도 보내지 않습니다.';
+    renderGbtn();
+  }
+  paintOwner();
+}
+function renderGbtn(){
+  var gbtn = document.getElementById('gbtn');
+  if (!gbtn || ACC) return;
+  if (window.google && google.accounts && google.accounts.id){
+    gbtn.innerHTML = '';
+    google.accounts.id.renderButton(gbtn, { theme:'outline', size:'large', text:'signin_with', shape:'rectangular', locale:'ko' });
+  }
+}
+function onCred(resp){
+  var p = parseJwt(resp && resp.credential);
+  if (!p) return;
+  var carry = { marks: LS.get('marks', []), mynum: LS.get('mynum',''), kw: LS.get('kw','') };
+  ACC = { sub: p.sub, name: p.name || p.email, email: p.email };
+  try{ localStorage.setItem('giw26_acct', JSON.stringify(ACC)); }catch(e){}
+  if (!LS.get('marks', null) && carry.marks.length) LS.set('marks', carry.marks);
+  if (!LS.get('mynum','') && carry.mynum) LS.set('mynum', carry.mynum);
+  if (!LS.get('kw','') && carry.kw) LS.set('kw', carry.kw);
+  if (!LS.get('myname','')) LS.set('myname', ACC.name);
+  marks = LS.get('marks', []);
+  var nameBox = document.getElementById('myname'); if (nameBox) nameBox.value = LS.get('myname','');
+  var numBox = document.getElementById('mynum'); if (numBox) numBox.value = LS.get('mynum','');
+  document.getElementById('kw').value = LS.get('kw', DEFAULT_KW);
+  paintAcct(); renderAll(); paintPicks();
+}
+document.getElementById('signout').onclick = function(){
+  if (window.google && google.accounts && google.accounts.id) google.accounts.id.disableAutoSelect();
+  ACC = null;
+  try{ localStorage.removeItem('giw26_acct'); }catch(e){}
+  marks = LS.get('marks', []);
+  document.getElementById('kw').value = LS.get('kw', DEFAULT_KW);
+  var nb = document.getElementById('myname'); if (nb) nb.value = LS.get('myname','');
+  var nu = document.getElementById('mynum'); if (nu) nu.value = LS.get('mynum','');
+  paintAcct(); renderAll(); paintPicks();
+};
+window.gsiReady = function(){
+  if (!(window.google && google.accounts && google.accounts.id)) return;
+  google.accounts.id.initialize({ client_id: CLIENT_ID, callback: onCred, auto_select: false, cancel_on_tap_outside: true });
+  renderGbtn();
+};
+if (window.google && google.accounts) window.gsiReady();
+
 /* ---------- 사용법 안내 ---------- */
 var TOUR = [
   { view:'ai', sel:'#askform', title:'여기에 물어보세요',
@@ -964,6 +1042,7 @@ function paintOwner(){
 function renderAll(){ renderRec(); renderProg(); renderPost(); renderMine(); paintOwner(); }
 document.getElementById('kw').value = LS.get('kw', DEFAULT_KW);
 renderAll();
+paintAcct();
 </script>
 </body>
 </html>
