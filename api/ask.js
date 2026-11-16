@@ -2,15 +2,25 @@
 // API 키는 Vercel 환경변수 ANTHROPIC_API_KEY 에만 있으므로 방문자에게 노출되지 않는다.
 
 const MODEL = 'claude-sonnet-4-5-20250929';
-const MAX_TOKENS = 1000;
+const MAX_TOKENS = 900;
 const MAX_QUESTION = 500;
-const MAX_CONTEXT = 24000;
-const MAX_TURNS = 12;
-const RATE_LIMIT = 10;    // IP당 분당
-const DAILY_CAP = 1500;   // 전체 하루 (비용 안전장치)
+const MAX_CONTEXT = 16000;
+const IP_LIMIT = 40;      // IP당 분당 (학회 공용 와이파이는 여러 명이 같은 IP를 쓴다)
+const CID_LIMIT = 8;      // 브라우저당 분당
+const DAILY_CAP = 900;    // 전체 하루 (비용 안전장치)
 
-const hits = new Map();
+const ipHits = new Map();
+const cidHits = new Map();
 let dayKey = '', dayCount = 0;
+
+function tooFast(store, key, limit) {
+  const now = Date.now();
+  const arr = (store.get(key) || []).filter(t => now - t < 60000);
+  arr.push(now);
+  store.set(key, arr);
+  if (store.size > 5000) store.clear();
+  return arr.length > limit;
+}
 
 export default async function handler(req, res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -19,17 +29,17 @@ export default async function handler(req, res) {
   if (req.method === 'OPTIONS') return res.status(204).end();
   if (req.method !== 'POST') return res.status(405).json({ answer: 'POST만 받습니다.' });
 
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const ip = (req.headers['x-forwarded-for'] || 'anon').split(',')[0].trim();
-  const now = Date.now();
-  const arr = (hits.get(ip) || []).filter(t => now - t < 60000);
-  arr.push(now); hits.set(ip, arr);
-  if (arr.length > RATE_LIMIT) return res.status(429).json({ answer: '질문이 너무 빨라요. 잠시 후 다시 시도해주세요.' });
+  const cid = String(body.cid || '').slice(0, 24) || ip;
+
+  if (tooFast(cidHits, cid, CID_LIMIT) || tooFast(ipHits, ip, IP_LIMIT))
+    return res.status(429).json({ answer: '질문이 너무 빨라요. 잠시 후 다시 시도해주세요.' });
 
   const today = new Date().toISOString().slice(0, 10);
   if (dayKey !== today) { dayKey = today; dayCount = 0; }
-  if (++dayCount > DAILY_CAP) return res.status(429).json({ answer: '오늘 사용량이 많아 쉬는 중이에요. 검색 탭을 이용해주세요.' });
+  if (++dayCount > DAILY_CAP) return res.status(429).json({ answer: '오늘 사용량이 많아 쉬는 중이에요. 프로그램 검색 탭을 이용해주세요.' });
 
-  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : (req.body || {});
   const question = String(body.question || '').slice(0, MAX_QUESTION);
   const context = String(body.context || '').slice(0, MAX_CONTEXT);
   const system = String(body.system || '') ||
@@ -39,7 +49,7 @@ export default async function handler(req, res) {
     ? rawMsgs.slice(-12)
         .filter(m => m && (m.role === 'user' || m.role === 'assistant') && m.content)
         .map(m => ({ role: m.role, content: String(m.content).slice(0, MAX_CONTEXT) }))
-    : [{ role: 'user', content: `학회 데이터:\n${context}\n\n질문: ${question}` }];
+    : [{ role: 'user', content: '학회 데이터:\n' + context + '\n\n질문: ' + question }];
   if (!messages.length || messages[0].role !== 'user')
     return res.status(400).json({ answer: '질문이 비었어요.' });
 
