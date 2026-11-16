@@ -1,0 +1,7 @@
+{
+  "name": "giw2026-assistant",
+  "private": true,
+  "dependencies": {
+    "@vercel/blob": "^2.0.0"
+  }
+}
