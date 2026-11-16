@@ -30,7 +30,7 @@
   --measure:74ch; --wrap:1180px;
 }
 *{box-sizing:border-box}
-html,body{overflow-x:clip}
+html,body{overflow-x:clip;max-width:100%}
 html{background:var(--color-paper)}
 body{margin:0;background:var(--color-paper);color:var(--color-ink-2);
   font:400 var(--text-base)/1.55 var(--font-body);-webkit-font-smoothing:antialiased}
@@ -676,7 +676,8 @@ function newTurn(q){
   d.innerHTML = '<h3></h3><div class="answer thinking">답을 찾고 있어요<span class="dots"><i></i><i></i><i></i></span></div>';
   d.querySelector('h3').textContent = q;
   chat.appendChild(d);
-  d.scrollIntoView({ block:'start', behavior:'smooth' });
+  var top = d.getBoundingClientRect().top + window.scrollY - 70;
+  window.scrollTo({ top: top, behavior:'smooth' });
   return d;
 }
 var SYS = '너는 BIOINFO/GIW ISCB-Asia 2026 학회(2026년 11월 17일-20일, 연세대학교)의 안내 비서다. ' +
@@ -758,8 +759,7 @@ function askWith(q){
     return (window.innerHeight + window.scrollY) >= (document.body.scrollHeight - 220);
   }
   function scrollToEnd(){
-    var c = document.querySelector('.composer');
-    if (c) c.scrollIntoView({ block:'end' });
+    window.scrollTo(0, document.documentElement.scrollHeight);
   }
   if (ep){
     stream(ep, { messages: outgoing, system: SYS, question: q, context: r.ctx, cid: cid, stream: true },
