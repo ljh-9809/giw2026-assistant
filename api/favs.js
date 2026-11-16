@@ -58,7 +58,7 @@ export default async function handler(req, res) {
     const payload = JSON.stringify({ marks: marks, updated: Date.now() });
     try {
       await put(pathname, payload, {
-        access: 'public',
+        access: 'private',
         contentType: 'application/json',
         addRandomSuffix: false,
         allowOverwrite: true,
