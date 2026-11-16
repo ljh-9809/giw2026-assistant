@@ -125,7 +125,17 @@ footer .facts td{color:var(--color-muted)}
   .composer .btn:last-child{grid-column:2}
   .talks li{grid-template-columns:64px minmax(0,1fr)}
 }
-@media (prefers-reduced-motion:reduce){*{animation:none!important}}
+@media (max-width:560px){
+  table.list{table-layout:fixed}
+  table.list th:first-child,table.list td:first-child{width:66px}
+  table.list th:last-child,table.list td:last-child{width:50px}
+  table.list td{padding:var(--space-sm) var(--space-sm) var(--space-sm) 0}
+  td.when{font-size:12px}
+  .title{font-size:15px}
+  .btn--mini{padding:3px 6px;font-size:12px}
+  .talks li{grid-template-columns:minmax(0,1fr);gap:2px}
+}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
 </style>
 </head>
 <body>
