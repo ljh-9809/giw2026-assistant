@@ -102,6 +102,19 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
 @keyframes blink{0%,80%,100%{opacity:.25}40%{opacity:1}}
 .answer .caret{display:inline-block;width:7px;height:1em;vertical-align:-2px;
   background:var(--color-accent);margin-left:2px;animation:blink 1s infinite}
+.histbar{display:flex;align-items:center;gap:var(--space-md);margin-bottom:var(--space-md)}
+#histlist{border-top:var(--rule-bar) solid var(--color-rule-2);margin-bottom:var(--space-lg)}
+.histrow{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:var(--space-sm);align-items:center;
+  border-bottom:var(--rule-hair) solid var(--color-rule);padding:12px 0}
+.histrow button.open{background:transparent;border:0;text-align:left;cursor:pointer;padding:0;
+  font:400 var(--text-base)/1.4 var(--font-body);color:var(--color-ink);min-width:0}
+.histrow button.open:hover{text-decoration:underline;text-decoration-color:var(--color-accent)}
+.histrow .at{font-family:var(--font-outlier);font-size:13px;color:var(--color-muted);display:block;margin-top:2px}
+.kind{display:inline-block;font:500 12px/1.2 var(--font-display);letter-spacing:0;
+  border:var(--rule-hair) solid var(--color-rule-2);border-radius:var(--radius-pill);
+  padding:2px 7px;margin-bottom:4px;color:var(--color-ink-2);background:var(--color-paper-2)}
+.kind--p{font-family:var(--font-outlier);border-color:var(--color-accent);color:var(--color-accent)}
+table.refs{margin-top:var(--space-md)}
 .failed{color:var(--color-accent-2);font-size:var(--text-sm);margin-top:var(--space-sm)}
 @media (prefers-reduced-motion:reduce){.dots i,.answer .caret{animation:none}}
 .answer{max-width:var(--measure)}
@@ -194,7 +207,7 @@ footer p{margin:0;font-size:var(--text-sm)}
     <div class="mast-top">
       <div>
         <h1>GIW 2026 학회 비서</h1>
-        <p class="muted" style="margin-top:var(--space-sm)">프로그램과 포스터를 한국어로 물어보면 찾아서 답합니다.</p>
+        <p class="lede" style="margin-top:var(--space-sm);max-width:34ch">일정은 제가 챙기겠습니다. 발표도 포스터도 한국어로 물어보세요.</p>
       </div>
       <table class="facts">
         <tbody>
@@ -229,6 +242,11 @@ footer p{margin:0;font-size:var(--text-sm)}
 <noscript><p>이 도구는 자바스크립트로 프로그램 데이터를 그립니다. 스크립트를 끈 상태라면 공식 프로그램을 직접 보세요: <a href="https://virtual.oxfordabstracts.com/event/77416/program">virtual.oxfordabstracts.com/event/77416/program</a></p></noscript>
 
 <section id="view-ai" class="view">
+  <div class="histbar">
+    <button class="btn btn--mini" type="button" id="histbtn">이전 대화</button>
+    <span class="muted" id="histnow"></span>
+  </div>
+  <div id="histlist" class="hide"></div>
   <div id="chat"></div>
   <div class="sheet" id="intro">
     <h2>무엇이 궁금한가요</h2>
@@ -734,17 +752,28 @@ function mdToHtml(t){
   h = h.replace(/\n/g,'<br>');
   return h;
 }
+function refRow(h){
+  var isP = h.kind === 'poster';
+  var when = isP ? '11월 18일 17:00, 11월 19일 16:30' : dayLabel(h.obj.date) + ' ' + h.obj.time;
+  var where = isP ? 'The Commons Lobby' : (h.obj.room || '');
+  var head = isP ? h.obj.title : h.obj.title;
+  var id = isP ? h.obj.num : 'S' + h.obj.id;
+  return '<tr><td class="when">' + (isP ? '<span class="kind kind--p">' + esc(h.obj.num) + '</span>' : '<span class="kind">세션</span>') +
+    '<div>' + esc(when) + '</div></td>' +
+    '<td><div class="title"><a href="' + esc(h.url || '#') + '" target="_blank" rel="noopener">' + esc(head) + '</a></div>' +
+    (where ? '<div class="sub">' + esc(where) + '</div>' : '') + '</td>' +
+    '<td class="pick">' + pickBtn(id) + '</td></tr>';
+}
 function refsTable(used){
   if (!used.length) return '';
-  var rows = used.slice(0,5).map(function(h){
-    var when = h.kind==='poster' ? h.obj.num : dayLabel(h.obj.date)+' '+h.obj.time;
-    var where = h.kind==='poster' ? 'The Commons Lobby' : (h.obj.room||'');
-    return '<tr><td class="when">'+esc(when)+'</td>'+
-      '<td><div class="title"><a href="'+esc(h.url||'#')+'" target="_blank" rel="noopener">'+esc(h.label)+'</a></div>'+
-      (where?'<div class="sub">'+esc(where)+'</div>':'')+'</td>'+
-      '<td class="pick">'+pickBtn(h.kind==='poster' ? h.obj.num : 'S'+h.obj.id)+'</td></tr>';
-  }).join('');
-  return '<table class="list"><thead><tr><th scope="col">근거</th><th scope="col">세션과 포스터</th><th scope="col"><span class="sr">담기</span></th></tr></thead><tbody>'+rows+'</tbody></table>';
+  var ss = used.filter(function(h){ return h.kind === 'session'; }).slice(0,4);
+  var pp = used.filter(function(h){ return h.kind === 'poster'; }).slice(0,5);
+  var out = '';
+  if (ss.length) out += '<table class="list refs"><thead><tr><th scope="col">세션 ' + ss.length + '건</th><th scope="col">제목</th><th scope="col"><span class="sr">담기</span></th></tr></thead><tbody>' +
+    ss.map(refRow).join('') + '</tbody></table>';
+  if (pp.length) out += '<table class="list refs"><thead><tr><th scope="col">포스터 ' + pp.length + '건</th><th scope="col">제목</th><th scope="col"><span class="sr">담기</span></th></tr></thead><tbody>' +
+    pp.map(refRow).join('') + '</tbody></table>';
+  return out;
 }
 function newTurn(q){
   var intro = document.getElementById('intro');
@@ -808,6 +837,7 @@ function askWith(q){
     while (CHAT.length > 12) CHAT.shift();
     bodyEl.classList.remove('thinking');
     bodyEl.innerHTML = mdToHtml(answer) + (stopped ? '<div class="failed">여기서 멈췄습니다.</div>' : '');
+    saveTurn(q, answer);
     if (failed) bodyEl.insertAdjacentHTML('beforeend', '<div class="failed">' + esc(failed) + '</div>');
     turn.insertAdjacentHTML('beforeend', refsTable(r.used));
   }
@@ -880,8 +910,10 @@ document.getElementById('ask').addEventListener('keydown', function(e){
 });
 document.getElementById('newchat').onclick = function(){
   if (BUSY) { BUSY.abort(); BUSY = null; setBusy(false); }
-  CHAT.length = 0; chat.innerHTML = '';
+  CHAT.length = 0; chat.innerHTML = ''; CUR = null;
   document.getElementById('intro').classList.remove('hide');
+  document.getElementById('histlist').classList.add('hide');
+  paintHistNow();
   document.getElementById('ask').focus();
 };
 var EXAMPLES = ['11월 18일 오후 발표 알려줘','foundation model 관련 발표 있어','약물 내성 연구 뭐 있어','single-cell 포스터 찾아줘','Jong Bhak 발표 언제야','내일 오전엔 뭐 들을까'];
@@ -893,6 +925,83 @@ document.getElementById('examples').addEventListener('click', function(e){
 
 
 
+
+
+/* ---------- 대화 기록 ---------- */
+var CHATS = LS.get('chats', []);
+var CUR = null;
+function chatTitle(q){ return q.length > 28 ? q.slice(0,28) + '…' : q; }
+function saveTurn(q, a){
+  if (!CUR){
+    CUR = 'c' + Date.now();
+    CHATS.unshift({ id: CUR, title: chatTitle(q), at: Date.now(), turns: [] });
+    CHATS = CHATS.slice(0, 20);
+  }
+  var c = CHATS.filter(function(x){ return x.id === CUR; })[0];
+  if (!c) return;
+  c.turns.push({ q: q, a: a });
+  if (c.turns.length > 40) c.turns = c.turns.slice(-40);
+  c.at = Date.now();
+  LS.set('chats', CHATS);
+  paintHistNow();
+}
+function fmtAt(ts){
+  var d = new Date(ts), n = new Date();
+  var same = d.toDateString() === n.toDateString();
+  var hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  return same ? '오늘 ' + hh : (d.getMonth()+1) + '월 ' + d.getDate() + '일 ' + hh;
+}
+function paintHistNow(){
+  var n = document.getElementById('histnow');
+  if (!n) return;
+  var c = CHATS.filter(function(x){ return x.id === CUR; })[0];
+  n.textContent = c ? c.title : (CHATS.length ? CHATS.length + '개 보관 중' : '');
+}
+function renderHist(){
+  var box = document.getElementById('histlist');
+  if (!CHATS.length){ box.innerHTML = '<p class="muted" style="padding:12px 0">아직 보관된 대화가 없습니다.</p>'; return; }
+  box.innerHTML = CHATS.map(function(c){
+    return '<div class="histrow"><button type="button" class="open" data-chat="' + c.id + '">' +
+      esc(c.title) + '<span class="at">' + fmtAt(c.at) + ', ' + c.turns.length + '문답</span></button>' +
+      '<button type="button" class="btn btn--mini" data-delchat="' + c.id + '">삭제</button></div>';
+  }).join('');
+}
+function openChat(id){
+  var c = CHATS.filter(function(x){ return x.id === id; })[0];
+  if (!c) return;
+  CUR = id; CHAT.length = 0;
+  chat.innerHTML = '';
+  document.getElementById('intro').classList.add('hide');
+  c.turns.forEach(function(t){
+    var d = document.createElement('article'); d.className = 'turn';
+    d.innerHTML = '<h3></h3><div class="answer"></div>';
+    d.querySelector('h3').textContent = t.q;
+    d.querySelector('.answer').innerHTML = mdToHtml(t.a);
+    chat.appendChild(d);
+    CHAT.push({ role:'user', content: t.q });
+    CHAT.push({ role:'assistant', content: t.a });
+  });
+  while (CHAT.length > 12) CHAT.shift();
+  document.getElementById('histlist').classList.add('hide');
+  paintHistNow();
+  window.scrollTo({ top: 0 });
+}
+document.getElementById('histbtn').onclick = function(){
+  var box = document.getElementById('histlist');
+  var show = box.classList.contains('hide');
+  if (show) renderHist();
+  box.classList.toggle('hide', !show);
+};
+document.getElementById('histlist').addEventListener('click', function(e){
+  var o = e.target.closest('[data-chat]');
+  if (o){ openChat(o.dataset.chat); return; }
+  var d = e.target.closest('[data-delchat]');
+  if (d){
+    CHATS = CHATS.filter(function(x){ return x.id !== d.dataset.delchat; });
+    if (CUR === d.dataset.delchat){ CUR = null; CHAT.length = 0; chat.innerHTML = ''; document.getElementById('intro').classList.remove('hide'); }
+    LS.set('chats', CHATS); renderHist(); paintHistNow();
+  }
+});
 
 /* ---------- 기기 간 동기화 ---------- */
 var TOK = null;
@@ -1045,6 +1154,7 @@ document.getElementById('kw').value = LS.get('kw', DEFAULT_KW);
 renderAll();
 paintAcct();
 syncState();
+paintHistNow();
 </script>
 </body>
 </html>
