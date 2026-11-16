@@ -283,7 +283,7 @@ footer p{margin:0;font-size:var(--text-sm)}
 <section id="view-mine" class="view hide">
   <h2>내 일정</h2>
   <p class="muted" id="mineowner">담기를 누른 세션과 포스터가 시간순으로 모입니다.</p>
-  <p class="muted">이 목록은 지금 쓰는 브라우저에만 저장됩니다. 다른 기기에서 보려면 아래 링크 복사를 눌러 그 링크를 열면 됩니다.</p>
+  <p class="muted">이 목록은 지금 쓰는 브라우저에만 저장됩니다. 서버로 보내지 않으니 브라우저 데이터를 지우거나 시크릿 창을 닫으면 함께 사라집니다. 다른 기기로 옮기려면 아래 링크 복사를 누르고 그 주소를 그 기기에서 열면 되는데, 그 링크를 받은 사람은 누구나 같은 목록을 볼 수 있습니다.</p>
   <div class="examples">
     <button class="btn" id="ics" type="button">캘린더 파일 내려받기</button>
     <button class="btn" id="share" type="button">담은 목록 링크 복사</button>
@@ -551,41 +551,79 @@ function myItems(){
   });
   return out.sort(function(a,b){ return (a.date+a.time).localeCompare(b.date+b.time); });
 }
+function mineRow(it){
+  var o = it.obj;
+  var when = dayLabel(it.date) + ' ' + (it.type==='s' ? o.time : '17:00-18:00');
+  var place = it.type==='s' ? (o.room||'') : 'The Commons Lobby';
+  var id = it.type==='s' ? 'S'+o.id : o.num;
+  var head = it.type==='s' ? esc(o.title) : esc(o.num) + ' ' + esc(o.title);
+  var sub = it.type==='s' ? esc(o.track||'') : esc(o.authors.join(', '));
+  return '<tr><td class="when">'+esc(when)+'</td>'+
+    '<td><div class="title"><a href="'+esc(o.url||'#')+'" target="_blank" rel="noopener">'+head+'</a></div>'+
+    (sub?'<div class="sub">'+sub+'</div>':'')+'</td>'+
+    '<td class="sub room">'+esc(place)+'</td>'+
+    '<td class="pick">'+pickBtn(id)+'</td></tr>';
+}
 function renderMine(){
   var items = myItems();
   if(!items.length){ document.getElementById('mineout').innerHTML='<p class="muted">아직 비어 있습니다. 목록에서 담기를 누르세요.</p>'; return; }
-  var out='', cur='', srows='', prows='';
-  function flush(){ if(srows){ out += sessionTable(srows); srows=''; } if(prows){ out += posterTable(prows); prows=''; } }
+  var out='', cur='', rows='';
   items.forEach(function(it){
-    if (it.date!==cur){ flush(); cur=it.date; out += '<h3 class="daygrp">'+dayLabel(cur)+'</h3>'; }
-    if (it.type==='s') { if(prows){ out += posterTable(prows); prows=''; } srows += sessionRow(it.obj, [], true); }
-    else { if(srows){ out += sessionTable(srows); srows=''; } prows += posterRow(it.obj, []); }
+    if (it.date!==cur){ if(rows){ out += sessionTable(rows); rows=''; } cur=it.date; out += '<h3 class="daygrp">'+dayLabel(cur)+'</h3>'; }
+    rows += mineRow(it);
   });
-  flush();
+  if (rows) out += sessionTable(rows);
   document.getElementById('mineout').innerHTML = out;
 }
-document.getElementById('clear').onclick = function(){ marks=[]; LS.set('marks',marks); renderAll(); };
+document.getElementById('clear').onclick = function(){
+  if (!marks.length) return;
+  if (!window.confirm('담은 '+marks.length+'개를 모두 지울까요? 되돌릴 수 없습니다.')) return;
+  marks=[]; LS.set('marks',marks); renderAll(); paintPicks();
+};
 document.getElementById('share').onclick = function(){
   var u = location.origin+location.pathname+'#bm='+marks.join(',');
   if (navigator.clipboard) navigator.clipboard.writeText(u);
   document.getElementById('mineout').insertAdjacentHTML('afterbegin','<p class="muted">링크를 복사했습니다. '+esc(u)+'</p>');
 };
+function icsFold(line){
+  var out = '', cur = '', bytes = 0, limit = 72;
+  for (var i=0;i<line.length;i++){
+    var ch = line.charAt(i);
+    var b = unescape(encodeURIComponent(ch)).length;
+    if (bytes + b > limit){ out += cur + '\r\n '; cur = ''; bytes = 1; limit = 72; }
+    cur += ch; bytes += b;
+  }
+  return out + cur;
+}
+function icsEsc(s){ return String(s||'').replace(/\\/g,'\\\\').replace(/[\r\n]+/g,' ').replace(/([,;])/g,'\\$1'); }
 document.getElementById('ics').onclick = function(){
   var items = myItems();
-  var ics = 'BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//GIW2026 assistant//KO\r\nCALSCALE:GREGORIAN\r\n';
+  if (!items.length){ alert('담은 일정이 없습니다.'); return; }
+  var stamp = new Date().toISOString().replace(/[-:]/g,'').split('.')[0] + 'Z';
+  var lines = ['BEGIN:VCALENDAR','VERSION:2.0','PRODID:-//GIW2026 assistant//KO','CALSCALE:GREGORIAN'];
   items.forEach(function(it,i){
     var title = it.type==='s' ? it.obj.title : (it.obj.num+' '+it.obj.title);
     var loc = it.type==='s' ? (it.obj.room||'Yonsei University') : 'The Commons Lobby';
-    ics += 'BEGIN:VEVENT\r\nUID:giw26-'+i+'-'+Date.now()+'@local\r\n'+
-      'DTSTART;TZID=Asia/Seoul:'+startISO(it.date,it.time)+'\r\n'+
-      'DTEND;TZID=Asia/Seoul:'+endISO(it.date,it.time)+'\r\n'+
-      'SUMMARY:'+title.replace(/[\r\n,;]/g,' ')+'\r\nLOCATION:'+loc.replace(/[\r\n,;]/g,' ')+'\r\n'+
-      'DESCRIPTION:'+(it.obj.url||'')+'\r\nBEGIN:VALARM\r\nTRIGGER:-PT15M\r\nACTION:DISPLAY\r\nDESCRIPTION:'+
-      title.replace(/[\r\n,;]/g,' ')+'\r\nEND:VALARM\r\nEND:VEVENT\r\n';
+    var time = it.type==='s' ? it.time : '17:00-18:00';
+    lines.push('BEGIN:VEVENT');
+    lines.push('UID:giw26-'+i+'-'+Date.now()+'@giw2026-assistant');
+    lines.push('DTSTAMP:'+stamp);
+    lines.push('DTSTART;TZID=Asia/Seoul:'+startISO(it.date,time));
+    lines.push('DTEND;TZID=Asia/Seoul:'+endISO(it.date,time));
+    lines.push('SUMMARY:'+icsEsc(title));
+    lines.push('LOCATION:'+icsEsc(loc));
+    lines.push('DESCRIPTION:'+icsEsc(it.obj.url||''));
+    lines.push('BEGIN:VALARM');
+    lines.push('TRIGGER:-PT15M');
+    lines.push('ACTION:DISPLAY');
+    lines.push('DESCRIPTION:'+icsEsc(title));
+    lines.push('END:VALARM');
+    lines.push('END:VEVENT');
   });
-  ics += 'END:VCALENDAR\r\n';
+  lines.push('END:VCALENDAR');
+  var ics = lines.map(icsFold).join('\r\n') + '\r\n';
   var a=document.createElement('a');
-  a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar'}));
+  a.href=URL.createObjectURL(new Blob([ics],{type:'text/calendar;charset=utf-8'}));
   a.download='giw2026_my_schedule.ics'; a.click();
 };
 
