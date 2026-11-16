@@ -3,7 +3,7 @@
 export const config = { runtime: 'edge' };
 
 const MODEL = 'claude-sonnet-4-5-20250929';
-const MAX_TOKENS = 900;
+const MAX_TOKENS = 1500;
 const MAX_QUESTION = 500;
 const MAX_CONTEXT = 16000;
 const IP_LIMIT = 40;    // IP당 분당 (학회 공용 와이파이는 여러 명이 같은 IP를 쓴다)
