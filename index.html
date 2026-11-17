@@ -123,27 +123,44 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
   font:400 var(--text-base)/1.4 var(--font-body);color:var(--color-ink);min-width:0}
 .histrow button.open:hover{text-decoration:underline;text-decoration-color:var(--color-accent)}
 .histrow .at{font-family:var(--font-outlier);font-size:13px;color:var(--color-muted);display:block;margin-top:2px}
-.tt{overflow-x:auto;border-top:var(--rule-bar) solid var(--color-rule-2);padding-top:0;position:relative}
+.tt{overflow-x:auto;border-top:var(--rule-bar) solid var(--color-rule-2);position:relative;
+  -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
 .ttgrid{display:grid;min-width:max-content;position:relative}
-.tthead{position:sticky;top:0;z-index:3;background:var(--color-paper);border-bottom:var(--rule-hair) solid var(--color-rule-2);
-  font:500 13px/1.3 var(--font-body);color:var(--color-muted);padding:8px 6px;white-space:normal}
-.ttcol{position:relative;border-left:var(--rule-hair) solid var(--color-rule)}
-.tttime{position:sticky;left:0;z-index:4;background:var(--color-paper);width:54px;min-width:54px}
+.tthead{position:sticky;top:0;z-index:3;background:var(--color-paper-2);
+  border-bottom:var(--rule-bar) solid var(--color-rule-2);
+  font:600 13.5px/1.3 var(--font-display);color:var(--color-ink);padding:10px 8px;letter-spacing:-0.01em}
+.ttcol{position:relative;border-left:var(--rule-hair) solid var(--color-rule);scroll-snap-align:start}
+.ttcol:nth-child(even){background:var(--color-paper-2)}
+.tttime{position:sticky;left:0;z-index:4;background:var(--color-paper);width:58px;min-width:58px}
 .tttick{position:absolute;left:0;right:0;border-top:var(--rule-hair) solid var(--color-rule)}
 .tttick.half{border-top-style:dotted}
-.ttlabel{position:absolute;left:0;width:52px;font-family:var(--font-outlier);font-size:12px;color:var(--color-muted);
-  transform:translateY(-2px);background:var(--color-paper);padding-right:4px}
-.ttblock{position:absolute;left:3px;right:3px;background:var(--color-sheet);border:var(--rule-hair) solid var(--color-rule-2);
-  border-left:3px solid var(--color-ink-2);padding:5px 7px;overflow:hidden;font-size:13px;line-height:1.35}
-.ttblock .tn{font-family:var(--font-outlier);font-size:11.5px;color:var(--color-muted);display:block}
-.ttblock a{font-family:var(--font-display);font-weight:500;font-size:13px;color:var(--color-ink);text-decoration:none;display:block;margin-top:1px}
+.ttlabel{position:absolute;left:0;width:56px;font-family:var(--font-outlier);font-size:12.5px;font-weight:500;
+  color:var(--color-ink-2);transform:translateY(-3px);background:var(--color-paper);padding-right:4px}
+.ttblock{position:absolute;left:3px;right:3px;background:var(--color-sheet);
+  border:var(--rule-hair) solid var(--color-rule-2);border-left:5px solid var(--color-ink);
+  padding:6px 8px;overflow:hidden;line-height:1.35}
+.ttblock .tn{font-family:var(--font-outlier);font-size:12px;color:var(--color-ink-2);display:block;letter-spacing:-0.02em}
+.ttblock a{font-family:var(--font-display);font-weight:600;font-size:13.5px;color:var(--color-ink);
+  text-decoration:none;display:block;margin-top:2px;letter-spacing:-0.01em}
 .ttblock a:hover{text-decoration:underline;text-decoration-color:var(--color-accent)}
-.ttblock.evt{background:var(--color-paper-2);border-left-color:var(--color-rule-2);color:var(--color-muted)}
-.ttblock.live{border-color:var(--color-accent);border-left-color:var(--color-accent);box-shadow:inset 0 0 0 1px var(--color-accent)}
-.ttblock.saved{border-left-color:var(--color-accent)}
+.ttblock.sat{border-left-color:var(--color-muted)}
+.ttblock.ind{border-left-color:var(--color-rule-2)}
+.ttblock.evt{background:var(--color-paper-2);border-left-color:var(--color-rule);}
+.ttblock.evt a{font-weight:500;color:var(--color-muted)}
+.ttblock.done{opacity:.5}
+.ttblock.live{border-color:var(--color-accent);border-left-color:var(--color-accent);border-width:2px;
+  border-left-width:6px;background:var(--color-sheet);opacity:1}
+.ttblock.live a{color:var(--color-accent-2)}
+.ttblock.saved{box-shadow:inset 0 0 0 2px var(--color-accent)}
 .ttnow{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--color-accent);z-index:5;pointer-events:none}
-.ttnow span{position:absolute;left:0;top:-9px;background:var(--color-accent);color:var(--color-accent-ink);
-  font:500 11px/1 var(--font-outlier);padding:3px 5px;border-radius:var(--radius-pill)}
+.ttnow span{position:absolute;left:0;top:-10px;background:var(--color-accent);color:var(--color-accent-ink);
+  font:600 11.5px/1 var(--font-outlier);padding:4px 6px;border-radius:var(--radius-pill)}
+.ttlegend{display:flex;flex-wrap:wrap;gap:var(--space-md);font-size:13px;color:var(--color-muted);margin:var(--space-sm) 0}
+.ttlegend i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
+.ttlegend b{display:inline-block;width:14px;height:12px;border:var(--rule-hair) solid var(--color-rule-2);
+  background:var(--color-sheet);border-left:5px solid var(--color-ink)}
+.ttlegend b.live{border-color:var(--color-accent);border-left-color:var(--color-accent)}
+.ttlegend b.evt{background:var(--color-paper-2);border-left-color:var(--color-rule)}
 .trline{display:grid;grid-template-columns:52px minmax(0,1fr);gap:var(--space-md);padding:5px 0;
   border-top:var(--rule-hair) dotted var(--color-rule);font-size:var(--text-sm);line-height:1.55}
 .trline .t{font-family:var(--font-outlier);color:var(--color-muted);font-size:13px}
@@ -335,6 +352,7 @@ footer p{margin:0;font-size:var(--text-sm)}
   <div id="gridwrap">
     <div class="examples" id="daypick"></div>
     <p class="count" id="gridnote"></p>
+    <div class="ttlegend"><i><b class="live"></b>진행 중</i><i><b></b>학술 세션</i><i><b class="evt"></b>행사와 휴식</i><i>지나간 일정은 흐리게</i></div>
     <div class="tt" id="ttout"></div>
   </div>
   <div id="listwrap" class="hide">
@@ -1191,7 +1209,7 @@ function gridDay(){
 }
 var ROOM_ORDER = ['The Centennial Hall','B125-126 (Grand Ballroom)','B110 (Choi Young Hall)','B111 (Kim Soon-Jeon Hall)',
   'B145 (IBK Hall)','B146 (Kwak Joung-Hwan Hall)','B147 (Jake Lah Hall)','322 Science Hall, Rm B104','The Commons Lobby'];
-var PXMIN = 1.15;
+var PXMIN = 1.5;
 function toMin(hm){ var p = (hm||'').split(':'); return (parseInt(p[0],10)||0)*60 + (parseInt(p[1],10)||0); }
 function spanOf(s){
   var p = (s.time||'').split('-');
@@ -1248,10 +1266,14 @@ function renderGrid(){
       var p = spanOf(s);
       var top = (p.a - minA) * PXMIN, h = Math.max(26, (p.b - p.a) * PXMIN - 3);
       var w = 100 / nLanes, left = s.__lane * w;
-      var evt = /^(Coffee break|Registration|Lunch|Welcome Reception|Closing|Opening Ceremony|Break)/i.test(s.title);
+      var evt = /^(Coffee break|Registration|Lunch|Welcome Reception|Closing|Opening Ceremony|Break|Gala|Poster)/i.test(s.title) || /Events/i.test(s.track||'');
+      var ind = /Industrial|Corporate|Luncheon/i.test((s.track||'') + ' ' + s.title);
+      var sat = /Satellite|Tutorial/i.test(s.track||'');
       var live = (day === nw.iso && nw.min >= p.a && nw.min < p.b);
+      var done = (day === nw.iso && nw.min >= p.b) || (day < nw.iso);
       var saved = isMarked('S' + s.id);
-      return '<div class="ttblock' + (evt ? ' evt' : '') + (live ? ' live' : '') + (saved ? ' saved' : '') + '"' +
+      return '<div class="ttblock' + (evt ? ' evt' : (ind ? ' ind' : (sat ? ' sat' : ''))) +
+        (live ? ' live' : '') + (done && !live ? ' done' : '') + (saved ? ' saved' : '') + '"' +
         ' style="top:' + top + 'px;height:' + h + 'px;left:calc(' + left + '% + 3px);width:calc(' + w + '% - 6px)">' +
         '<span class="tn">' + esc(s.time) + (saved ? ' 담음' : '') + '</span>' +
         '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a></div>';
