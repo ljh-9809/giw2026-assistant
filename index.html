@@ -123,6 +123,9 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
   font:400 var(--text-base)/1.4 var(--font-body);color:var(--color-ink);min-width:0}
 .histrow button.open:hover{text-decoration:underline;text-decoration-color:var(--color-accent)}
 .histrow .at{font-family:var(--font-outlier);font-size:13px;color:var(--color-muted);display:block;margin-top:2px}
+.vswitch{display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap;margin:var(--space-md) 0 var(--space-sm)}
+.vlabel{font:500 var(--text-sm)/1 var(--font-body);color:var(--color-muted);margin-right:2px}
+.vbtn.on{background:var(--color-ink);border-color:var(--color-ink);color:var(--color-paper)}
 .tt{overflow-x:auto;border-top:var(--rule-bar) solid var(--color-rule-2);position:relative;
   -webkit-overflow-scrolling:touch;scroll-snap-type:x proximity}
 .ttgrid{display:grid;min-width:max-content;position:relative}
@@ -362,6 +365,11 @@ footer p{margin:0;font-size:var(--text-sm)}
   <h2>프로그램</h2>
   <div class="filters">
     <div><label for="q">검색</label><input type="search" id="q" placeholder="제목, 발표자, 소속으로 찾기"></div>
+  </div>
+  <div class="vswitch" role="group" aria-label="보기 방식">
+    <span class="vlabel">보기 방식</span>
+    <button class="btn btn--mini vbtn on" type="button" data-pview="grid" aria-pressed="true">시간표로 보기</button>
+    <button class="btn btn--mini vbtn" type="button" data-pview="list" aria-pressed="false">목록으로 보기</button>
   </div>
   <div id="gridwrap">
     <div class="examples" id="daypick"></div>
@@ -643,11 +651,25 @@ function renderRec(){
 }
 
 /* ---------- 프로그램 ---------- */
+function setPView(mode){
+  var q = document.getElementById('q').value.trim();
+  if (mode === 'grid' && q){ document.getElementById('q').value = ''; q = ''; }
+  document.getElementById('gridwrap').classList.toggle('hide', mode !== 'grid');
+  document.getElementById('listwrap').classList.toggle('hide', mode === 'grid');
+  Array.prototype.forEach.call(document.querySelectorAll('.vbtn'), function(b){
+    var on = b.dataset.pview === mode;
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
+  if (mode === 'grid') renderGrid(); else renderProg();
+}
+document.querySelector('.vswitch').addEventListener('click', function(e){
+  var b = e.target.closest('[data-pview]'); if (!b) return;
+  setPView(b.dataset.pview);
+});
 document.getElementById('q').addEventListener('input', function(){
   var q = document.getElementById('q').value.trim();
-  document.getElementById('gridwrap').classList.toggle('hide', !!q);
-  document.getElementById('listwrap').classList.toggle('hide', !q);
-  if (q) renderProg(); else renderGrid();
+  setPView(q ? 'list' : 'grid');
 });
 function renderProg(){
   var q = document.getElementById('q').value.trim();
