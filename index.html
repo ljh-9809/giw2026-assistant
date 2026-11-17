@@ -155,12 +155,6 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
 .ttnow{position:absolute;left:0;right:0;height:0;border-top:2px solid var(--color-accent);z-index:5;pointer-events:none}
 .ttnow span{position:absolute;left:0;top:-10px;background:var(--color-accent);color:var(--color-accent-ink);
   font:600 11.5px/1 var(--font-outlier);padding:4px 6px;border-radius:var(--radius-pill)}
-.ttlegend{display:flex;flex-wrap:wrap;gap:var(--space-md);font-size:13px;color:var(--color-muted);margin:var(--space-sm) 0}
-.ttlegend i{font-style:normal;display:inline-flex;align-items:center;gap:6px}
-.ttlegend b{display:inline-block;width:14px;height:12px;border:var(--rule-hair) solid var(--color-rule-2);
-  background:var(--color-sheet);border-left:5px solid var(--color-ink)}
-.ttlegend b.live{border-color:var(--color-accent);border-left-color:var(--color-accent)}
-.ttlegend b.evt{background:var(--color-paper-2);border-left-color:var(--color-rule)}
 .trwarn{margin:var(--space-sm) 0 var(--space-md)}
 .trwarn summary{cursor:pointer;font:500 var(--text-sm)/1.4 var(--font-body);color:var(--color-muted)}
 .trwarn p{margin:var(--space-sm) 0 0}
@@ -367,22 +361,11 @@ footer p{margin:0;font-size:var(--text-sm)}
 <section id="view-prog" class="view hide">
   <h2>프로그램</h2>
   <div class="filters">
-    <div><label for="q">검색</label><input type="search" id="q" placeholder="제목, 발표자, 소속"></div>
-    <div><label for="day">날짜</label><select id="day">
-      <option value="">전체</option><option value="2026-11-17">11월 17일 화</option>
-      <option value="2026-11-18">11월 18일 수</option><option value="2026-11-19">11월 19일 목</option>
-      <option value="2026-11-20">11월 20일 금</option></select></div>
-    <div><label for="track">분류</label><select id="track"><option value="">전체</option></select></div>
-    <div><label for="hideEv"><input type="checkbox" id="hideEv" checked style="width:auto;margin-right:6px">쉬는 시간 숨기기</label></div>
-  </div>
-  <div class="examples" id="viewtoggle">
-    <button class="btn btn--primary btn--mini" type="button" data-pview="grid">시간표</button>
-    <button class="btn btn--mini" type="button" data-pview="list">목록</button>
+    <div><label for="q">검색</label><input type="search" id="q" placeholder="제목, 발표자, 소속으로 찾기"></div>
   </div>
   <div id="gridwrap">
     <div class="examples" id="daypick"></div>
     <p class="count" id="gridnote"></p>
-    <div class="ttlegend"><i><b class="live"></b>진행 중</i><i><b></b>학술 세션</i><i><b class="evt"></b>행사와 휴식</i><i>지나간 일정은 흐리게</i></div>
     <div class="tt" id="ttout"></div>
   </div>
   <div id="listwrap" class="hide">
@@ -660,20 +643,25 @@ function renderRec(){
 }
 
 /* ---------- 프로그램 ---------- */
-var trackSel = document.getElementById('track');
-Array.from(new Set(S.map(function(s){return s.track;}).filter(Boolean))).sort().forEach(function(t){
-  var o=document.createElement('option'); o.value=t; o.textContent=t; trackSel.appendChild(o);
+document.getElementById('q').addEventListener('input', function(){
+  var q = document.getElementById('q').value.trim();
+  document.getElementById('gridwrap').classList.toggle('hide', !!q);
+  document.getElementById('listwrap').classList.toggle('hide', !q);
+  if (q) renderProg(); else renderGrid();
 });
-['q','day','track','hideEv'].forEach(function(id){ document.getElementById(id).addEventListener('input', renderProg); });
 function renderProg(){
   var q = document.getElementById('q').value.trim();
   var terms = q ? q.split(/\s+/) : [];
-  var day = document.getElementById('day').value, tr = trackSel.value, hide = document.getElementById('hideEv').checked;
-  var list = S.filter(function(s){ return (!day||s.date===day) && (!tr||s.track===tr) && (!hide || !NOISE.test(s.title)); });
+  var list = S.filter(function(s){ return !NOISE.test(s.title); });
   if (q) list = list.filter(function(s){
     var all = (sTitleText(s)+' '+sTalkTitles(s)+' '+sPeople(s)).toLowerCase();
-    return terms.every(function(t){ return all.indexOf(t.toLowerCase()) >= 0; }); });
-  document.getElementById('prognote').textContent = list.length+'개 세션';
+    if (terms.every(function(t){ return all.indexOf(t.toLowerCase()) >= 0; })) return true;
+    var koK = [];
+    (q.match(/[가-힣]{2,4}/g) || []).forEach(function(w){ koK = koK.concat(koNameKeys(w)); });
+    if (koK.length){ var f = flatName(sPeople(s)); for (var i=0;i<koK.length;i++){ if (f.indexOf(koK[i]) >= 0) return true; } }
+    return false;
+  });
+  document.getElementById('prognote').textContent = q ? '"' + q + '" 검색 결과 ' + list.length + '개 세션' : list.length + '개 세션';
   var out='', cur='', rows='';
   list.forEach(function(s){
     if (s.date!==cur){ if(rows){ out += sessionTable(rows); rows=''; } cur=s.date; out += '<h3 class="daygrp">'+dayLabel(cur)+'</h3>'; }
@@ -1230,7 +1218,6 @@ function flatName(s){ return String(s||'').toLowerCase().replace(/[^a-z]/g,''); 
 
 
 /* ---------- 시간표 ---------- */
-var PVIEW = 'grid';
 var GRIDDAY = null;
 function gridDay(){
   if (GRIDDAY) return GRIDDAY;
@@ -1334,16 +1321,8 @@ document.getElementById('daypick').addEventListener('click', function(e){
   var b = e.target.closest('[data-gday]'); if (!b) return;
   GRIDDAY = b.dataset.gday; renderGrid();
 });
-document.getElementById('viewtoggle').addEventListener('click', function(e){
-  var b = e.target.closest('[data-pview]'); if (!b) return;
-  PVIEW = b.dataset.pview;
-  Array.prototype.forEach.call(document.querySelectorAll('[data-pview]'), function(x){
-    x.classList.toggle('btn--primary', x === b); });
-  document.getElementById('gridwrap').classList.toggle('hide', PVIEW !== 'grid');
-  document.getElementById('listwrap').classList.toggle('hide', PVIEW !== 'list');
-  if (PVIEW === 'grid') renderGrid();
-});
-setInterval(function(){ if (PVIEW === 'grid' && !document.getElementById('view-prog').classList.contains('hide')) renderGrid(); }, 60000);
+
+setInterval(function(){ if (!document.getElementById('view-prog').classList.contains('hide') && !document.getElementById('gridwrap').classList.contains('hide')) renderGrid(); }, 60000);
 
 /* ---------- 강연 기록 ---------- */
 var TRANS = null, TROPEN = null, TRFULL = null;
