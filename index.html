@@ -139,6 +139,8 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
 .tttime{position:sticky;left:0;z-index:4;background:var(--color-paper);width:58px;min-width:58px}
 .tttick{position:absolute;left:0;right:0;border-top:var(--rule-hair) solid var(--color-rule)}
 .tttick.half{border-top-style:dotted}
+.tttick.skip{border-top-style:dashed;opacity:.45}
+.ttlabel.dim{opacity:.6;font-size:11px}
 .ttlabel{position:absolute;left:0;width:56px;font-family:var(--font-outlier);font-size:12.5px;font-weight:500;
   color:var(--color-ink-2);transform:translateY(-3px);background:var(--color-paper);padding-right:4px}
 .ttblock{position:absolute;left:3px;right:3px;background:var(--color-sheet);
@@ -1350,20 +1352,35 @@ function renderGrid(){
   var list = all.filter(function(s){ return !!s.room; });
   if (!list.length){ document.getElementById('ttout').innerHTML = '<p class="muted">일정이 없습니다.</p>'; return; }
   var rooms = [];
-  ROOM_ORDER.forEach(function(r){ if (list.some(function(s){ return (s.room||'') === r; })) rooms.push(r); });
+  ROOM_ORDER.forEach(function(r){ if (list.some(function(s){ return s.room === r; })) rooms.push(r); });
   list.forEach(function(s){ if (rooms.indexOf(s.room) < 0) rooms.push(s.room); });
   var minA = 24*60, maxB = 0;
   list.forEach(function(s){ var p = spanOf(s); if (p.a < minA) minA = p.a; if (p.b > maxB) maxB = p.b; });
   minA = Math.floor(minA/30)*30; maxB = Math.ceil(maxB/30)*30;
-  var H = (maxB - minA) * PXMIN;
-  var cols = '54px repeat(' + rooms.length + ', minmax(156px, 1fr))';
+  var STEP = 5, busy = {};
+  list.forEach(function(s){ var p = spanOf(s);
+    for (var t0 = Math.floor(p.a/STEP)*STEP; t0 < p.b; t0 += STEP) busy[t0] = 1; });
+  var ys = {}, yy = 0;
+  for (var t1 = minA; t1 <= maxB; t1 += STEP){
+    ys[t1] = yy;
+    var isBusy = busy[t1] || busy[t1-STEP] || busy[t1+STEP];
+    yy += isBusy ? STEP * PXMIN : STEP * 0.22;
+  }
+  function Y(m){
+    var k = Math.max(minA, Math.min(maxB, Math.round(m/STEP)*STEP));
+    return (ys[k] || 0) + (m - k) * (busy[k] ? PXMIN : 0.22);
+  }
+  var H = yy;
+  var cols = '58px repeat(' + rooms.length + ', minmax(156px, 1fr))';
   var head = '<div class="tthead tttime"></div>' + rooms.map(function(r){ return '<div class="tthead">' + esc(r) + '</div>'; }).join('');
   var ticks = '', ticksLab = '';
-  for (var t = minA; t <= maxB; t += 30){
-    var y = (t - minA) * PXMIN;
-    var tick = '<div class="tttick' + (t % 60 ? ' half' : '') + '" style="top:' + y + 'px"></div>';
+  for (var h = minA; h <= maxB; h += 30){
+    var y = Y(h);
+    var skinny = !(busy[h] || busy[h-STEP]);
+    var tick = '<div class="tttick' + (h % 60 ? ' half' : '') + (skinny ? ' skip' : '') + '" style="top:' + y + 'px"></div>';
     ticks += tick; ticksLab += tick;
-    if (t % 60 === 0) ticksLab += '<div class="ttlabel" style="top:' + y + 'px">' + String(Math.floor(t/60)).padStart(2,'0') + ':00</div>';
+    if (h % 60 === 0 || !skinny) ticksLab += '<div class="ttlabel' + (skinny ? ' dim' : '') + '" style="top:' + y + 'px">' +
+      String(Math.floor(h/60)).padStart(2,'0') + ':' + String(h%60).padStart(2,'0') + '</div>';
   }
   var nw = nowMin();
   var body = '<div class="ttcol tttime" style="height:' + H + 'px;border-left:0">' + ticksLab + '</div>';
@@ -1374,12 +1391,12 @@ function renderGrid(){
     items.forEach(function(s){
       var p = spanOf(s), li = 0;
       while (lanes[li] !== undefined && lanes[li] > p.a) li++;
-      lanes[li] = p.b; s.__lane = li; s.__lanes = 0;
+      lanes[li] = p.b; s.__lane = li;
     });
     var nLanes = Math.max(1, lanes.length);
     var blocks = items.map(function(s){
       var p = spanOf(s);
-      var top = (p.a - minA) * PXMIN, h = Math.max(26, (p.b - p.a) * PXMIN - 3);
+      var top = Y(p.a), h2 = Math.max(30, Y(p.b) - Y(p.a) - 3);
       var w = 100 / nLanes, left = s.__lane * w;
       var evt = /^(Coffee break|Registration|Lunch|Welcome Reception|Closing|Opening Ceremony|Break|Gala|Poster)/i.test(s.title) || /Events/i.test(s.track||'');
       var ind = /Industrial|Corporate|Luncheon/i.test((s.track||'') + ' ' + s.title);
@@ -1389,7 +1406,7 @@ function renderGrid(){
       var saved = isMarked('S' + s.id);
       return '<div class="ttblock' + (evt ? ' evt' : (ind ? ' ind' : (sat ? ' sat' : ''))) +
         (live ? ' live' : '') + (done && !live ? ' done' : '') + (saved ? ' saved' : '') + '"' +
-        ' style="top:' + top + 'px;height:' + h + 'px;left:calc(' + left + '% + 3px);width:calc(' + w + '% - 6px)">' +
+        ' style="top:' + top + 'px;height:' + h2 + 'px;left:calc(' + left + '% + 3px);width:calc(' + w + '% - 6px)">' +
         '<span class="tn">' + esc(s.time) + (saved ? ' 담음' : '') + '</span>' +
         '<a href="' + esc(s.url) + '" target="_blank" rel="noopener">' + esc(s.title) + '</a></div>';
     }).join('');
@@ -1397,7 +1414,7 @@ function renderGrid(){
   });
   var nowLine = '';
   if (day === nw.iso && nw.min >= minA && nw.min <= maxB){
-    nowLine = '<div class="ttnow" style="top:' + ((nw.min - minA) * PXMIN + 38) + 'px"><span>지금 ' + nw.label + '</span></div>';
+    nowLine = '<div class="ttnow" style="top:' + (Y(nw.min) + 42) + 'px"><span>지금 ' + nw.label + '</span></div>';
   }
   document.getElementById('gridnote').textContent = dayLabel(day) + ', 세션 ' + list.length + '개' +
     (day === nw.iso ? ', 한국 시간 ' + nw.label + ' 기준' : '');
@@ -1407,8 +1424,8 @@ function renderGrid(){
     '<div class="ttgrid" style="grid-template-columns:' + cols + '">' + head + body + '</div>' + nowLine + extra;
   if (day === nw.iso && nw.min >= minA && nw.min <= maxB){
     var box = document.getElementById('ttout');
-    var y = (nw.min - minA) * PXMIN - 160;
-    if (y > 0) window.scrollTo({ top: box.getBoundingClientRect().top + window.scrollY + y - 120, behavior:'auto' });
+    var yy2 = Y(nw.min) - 160;
+    if (yy2 > 0) window.scrollTo({ top: box.getBoundingClientRect().top + window.scrollY + yy2 - 120, behavior:'auto' });
   }
 }
 document.getElementById('daypick').addEventListener('click', function(e){
