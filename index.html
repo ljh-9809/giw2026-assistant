@@ -123,6 +123,8 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
   font:400 var(--text-base)/1.4 var(--font-body);color:var(--color-ink);min-width:0}
 .histrow button.open:hover{text-decoration:underline;text-decoration-color:var(--color-accent)}
 .histrow .at{font-family:var(--font-outlier);font-size:13px;color:var(--color-muted);display:block;margin-top:2px}
+.absbox{margin-top:8px;padding:12px 14px;background:var(--color-sheet);
+  border-left:4px solid var(--color-rule-2);font-size:14.5px;line-height:1.65;white-space:pre-wrap;max-width:var(--measure)}
 .vswitch{display:flex;align-items:center;gap:var(--space-sm);flex-wrap:wrap;margin:var(--space-md) 0 var(--space-sm)}
 .vlabel{font:500 var(--text-sm)/1 var(--font-body);color:var(--color-muted);margin-right:2px}
 .vbtn.on{background:var(--color-ink);border-color:var(--color-ink);color:var(--color-paper)}
@@ -552,7 +554,10 @@ function scoreSession(s, terms){
 }
 function scorePoster(p, terms){
   var who = p.authors.join(' ')+' '+p.affils.join(' ');
-  return termScore(p.title, terms)*3 + termScore(who, terms) + nameBonus(p.authors.join(' '), terms);
+  var sc = termScore(p.title, terms)*3 + termScore(who, terms) + nameBonus(p.authors.join(' '), terms);
+  var a = absOf(p.num);
+  if (a) sc += Math.min(4, termScore(a, terms));
+  return sc;
 }
 function dayLabel(d){ var m = d.slice(5,7).replace(/^0/,''), dd = d.slice(8,10).replace(/^0/,'');
   return m+'월 '+dd+'일 '+(DOW[d]||''); }
@@ -581,12 +586,19 @@ function sessionRow(s, terms, openTalks){
     (s.desc?'<div class="sub">'+hl(s.desc, terms)+'</div>':'')+list+'</td>'+
     '<td class="sub room">'+esc(s.room||'')+'</td><td class="pick">'+pickBtn(id)+'</td></tr>';
 }
+var POPEN = null;
 function posterRow(p, terms){
   var mine = myNums().indexOf(p.num) >= 0;
+  var abs = absOf(p.num);
+  var open = POPEN === p.num;
   return '<tr><td class="when">'+esc(p.num)+(mine?'<div class="mine">내 포스터</div>':'')+'</td>'+
     '<td><div class="title"><a href="'+esc(p.url||'#')+'" target="_blank" rel="noopener">'+hl(p.title, terms)+'</a></div>'+
     '<div class="sub">'+hl(p.authors.join(', '), terms)+'</div>'+
-    '<div class="sub">'+hl(p.affils.join(', '), terms)+'</div></td>'+
+    '<div class="sub">'+hl(p.affils.join(', '), terms)+'</div>'+
+    (abs ? '<div class="examples" style="margin-top:8px"><button class="btn btn--mini" type="button" data-abs="'+p.num+'">'+
+      (open ? '초록 접기' : '초록 보기')+'</button></div>' +
+      (open ? '<div class="absbox">'+hl(abs, terms)+'</div>' : '') : '')+
+    '</td>'+
     '<td class="pick">'+pickBtn(p.num)+'</td></tr>';
 }
 function sessionTable(rows){
@@ -607,7 +619,9 @@ document.getElementById('views').addEventListener('click', function(e){
   try { b.scrollIntoView({ inline:'center', block:'nearest', behavior:'smooth' }); } catch(e){}
 });
 document.addEventListener('click', function(e){
-  var b = e.target.closest('button[data-pick]'); if(b) toggleMark(b.dataset.pick);
+  var b = e.target.closest('button[data-pick]'); if(b){ toggleMark(b.dataset.pick); return; }
+  var a = e.target.closest('button[data-abs]');
+  if (a){ POPEN = (POPEN === a.dataset.abs) ? null : a.dataset.abs; renderPost(); renderRec(); }
 });
 
 /* ---------- 키워드 추천 ---------- */
@@ -703,7 +717,7 @@ function renderPost(){
     var koK = [];
     (q.match(/[가-힣]{2,4}/g) || []).forEach(function(w){ koK = koK.concat(koNameKeys(w)); });
     list = P.filter(function(p){
-      var all = pText(p).toLowerCase();
+      var all = (pText(p) + ' ' + absOf(p.num)).toLowerCase();
       if (terms.every(function(t){ return all.indexOf(t.toLowerCase()) >= 0; })) return true;
       if (koK.length){ var f = flatName(p.authors.join(' ')); for (var i=0;i<koK.length;i++){ if (f.indexOf(koK[i]) >= 0) return true; } }
       return false;
@@ -862,9 +876,11 @@ function sessionLine(s){
     (s.talks.length ? '\n  - ' + s.talks.map(function(t){
       return t.time + ' ' + t.title + (t.speaker ? ' / ' + t.speaker + (t.affil ? ', ' + t.affil : '') : ''); }).join('\n  - ') : '');
 }
-function posterLine(p){
-  return '[' + p.num + ' 포스터, ' + POSTER_WHEN + '] ' + p.title + ' / ' + p.authors.join(', ') +
+function posterLine(p, withAbs){
+  var base = '[' + p.num + ' 포스터, ' + POSTER_WHEN + '] ' + p.title + ' / ' + p.authors.join(', ') +
     (p.affils.length ? ' (' + p.affils.join('; ') + ')' : '');
+  if (withAbs){ var a = absOf(p.num); if (a) base += '\n  초록: ' + a.replace(/\n/g,' ').slice(0, 1400); }
+  return base;
 }
 function retrieve(q){
   var terms = expand(q);
@@ -904,7 +920,16 @@ function retrieve(q){
     var sc = scorePoster(p, terms) + koHit(p.authors.join(' '));
     if (sc > 0) cand.push({ sc:sc, kind:'poster', obj:p, line:posterLine(p), url:p.url, label:p.num + ' ' + p.title }); });
   cand.sort(function(a,b){ return b.sc - a.sc; });
-  cand.slice(0, day ? 14 : 24).forEach(function(c){ push(c.kind, c.obj, c.line, c.url, c.label); });
+  cand.slice(0, day ? 14 : 24).forEach(function(c, i){
+    var line = c.line;
+    if (i < 3 && c.kind === 'poster') line = posterLine(c.obj, true);
+    if (i < 3 && c.kind === 'session' && c.obj.talks){
+      var extra = '';
+      c.obj.talks.forEach(function(t){ if (!extra){ var a = talkAbsOf(t.title); if (a) extra = '\n  초록(' + t.title.slice(0,60) + '): ' + a.replace(/\n/g,' ').slice(0, 1200); } });
+      line += extra;
+    }
+    push(c.kind, c.obj, line, c.url, c.label);
+  });
   if (TRANS && TRANS.talks && terms.length){
     var best = null, bestLines = null, bestScore = 0;
     TRANS.talks.forEach(function(t){
@@ -1238,6 +1263,24 @@ function koNameKeys(word){
 function flatName(s){ return String(s||'').toLowerCase().replace(/[^a-z]/g,''); }
 
 
+
+
+/* ---------- 초록집 ---------- */
+var ABS = null;
+function loadAbs(cb){
+  if (ABS) { cb && cb(); return; }
+  fetch('abstracts.json').then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+    ABS = j; if (cb) cb();
+    if (!document.getElementById('view-post').classList.contains('hide')) renderPost();
+  }).catch(function(){});
+}
+setTimeout(loadAbs, 1200);
+function absOf(num){ return (ABS && ABS.posters && ABS.posters[num]) ? ABS.posters[num] : ''; }
+function talkAbsOf(title){
+  if (!ABS || !ABS.talks) return '';
+  var t = ABS.talks.filter(function(x){ return x.title === title; })[0];
+  return t ? t.text : '';
+}
 
 /* ---------- 시간표 ---------- */
 var GRIDDAY = null;
