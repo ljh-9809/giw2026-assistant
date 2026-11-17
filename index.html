@@ -123,6 +123,10 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
   font:400 var(--text-base)/1.4 var(--font-body);color:var(--color-ink);min-width:0}
 .histrow button.open:hover{text-decoration:underline;text-decoration-color:var(--color-accent)}
 .histrow .at{font-family:var(--font-outlier);font-size:13px;color:var(--color-muted);display:block;margin-top:2px}
+.trline{display:grid;grid-template-columns:52px minmax(0,1fr);gap:var(--space-md);padding:5px 0;
+  border-top:var(--rule-hair) dotted var(--color-rule);font-size:var(--text-sm);line-height:1.55}
+.trline .t{font-family:var(--font-outlier);color:var(--color-muted);font-size:13px}
+.trbody{margin-top:var(--space-sm);max-height:420px;overflow:auto;border-top:var(--rule-bar) solid var(--color-rule-2);padding-top:var(--space-sm)}
 .mapfig{margin:0 0 var(--space-xl)}
 .mapfig img{width:100%;height:auto;display:block;border:var(--rule-hair) solid var(--color-rule-2);background:var(--color-sheet)}
 .mapfig figcaption{margin-top:var(--space-sm)}
@@ -243,6 +247,7 @@ footer p{margin:0;font-size:var(--text-sm)}
       <button type="button" role="tab" data-view="post" aria-selected="false">포스터</button>
       <button type="button" role="tab" data-view="rec" aria-selected="false">추천</button>
       <button type="button" role="tab" data-view="mine" aria-selected="false">즐겨찾기</button>
+      <button type="button" role="tab" data-view="rec2" aria-selected="false">강연 기록</button>
       <button type="button" role="tab" data-view="map" aria-selected="false">지도</button>
       <button type="button" role="tab" data-view="set" aria-selected="false">설정</button>
     </nav>
@@ -339,6 +344,15 @@ footer p{margin:0;font-size:var(--text-sm)}
     <button class="btn" id="clear" type="button">전부 비우기</button>
   </div>
   <div id="mineout"></div>
+</section>
+
+<section id="view-rec2" class="view hide">
+  <h2>강연 기록</h2>
+  <p class="muted" id="trnote">불러오는 중입니다.</p>
+  <div class="filters">
+    <div><label for="tq">기록 안에서 검색</label><input type="search" id="tq" placeholder="예: antibody, foundation model, 단어"></div>
+  </div>
+  <div id="trout"></div>
 </section>
 
 <section id="view-map" class="view hide">
@@ -511,7 +525,7 @@ function posterTable(rows){
 }
 
 /* ---------- views ---------- */
-var VIEWS = ['ai','prog','post','rec','mine','map','set'];
+var VIEWS = ['ai','prog','post','rec','mine','rec2','map','set'];
 document.getElementById('views').addEventListener('click', function(e){
   var b = e.target.closest('button[data-view]'); if(!b) return;
   Array.prototype.forEach.call(document.querySelectorAll('#views button'), function(x){
@@ -593,8 +607,16 @@ function renderPost(){
   var q = document.getElementById('pq').value.trim();
   var terms = q ? q.split(/\s+/) : [];
   var list = P;
-  if (q) list = P.filter(function(p){ var all = pText(p).toLowerCase();
-    return terms.every(function(t){ return all.indexOf(t.toLowerCase()) >= 0; }); });
+  if (q) {
+    var koK = [];
+    (q.match(/[가-힣]{2,4}/g) || []).forEach(function(w){ koK = koK.concat(koNameKeys(w)); });
+    list = P.filter(function(p){
+      var all = pText(p).toLowerCase();
+      if (terms.every(function(t){ return all.indexOf(t.toLowerCase()) >= 0; })) return true;
+      if (koK.length){ var f = flatName(p.authors.join(' ')); for (var i=0;i<koK.length;i++){ if (f.indexOf(koK[i]) >= 0) return true; } }
+      return false;
+    });
+  }
   document.getElementById('postnote').textContent = list.length+'개 포스터';
   document.getElementById('postout').innerHTML = list.length
     ? posterTable(list.slice(0,400).map(function(p){ return posterRow(p, terms); }).join(''))
@@ -771,15 +793,43 @@ function retrieve(q){
      .sort(function(a,b){ return a.time.localeCompare(b.time); })
      .forEach(function(s){ push('session', s, sessionLine(s), s.url, s.title); });
   }
+  var koKeys = [];
+  (q.match(/[가-힣]{2,4}/g) || []).forEach(function(w){
+    if (KO[w] || KO_STOP.test(w)) return;
+    koKeys = koKeys.concat(koNameKeys(w));
+  });
+  function koHit(text){
+    if (!koKeys.length) return 0;
+    var f = flatName(text);
+    for (var i=0;i<koKeys.length;i++){ if (f.indexOf(koKeys[i]) >= 0) return 14; }
+    return 0;
+  }
   var cand = [];
   S.filter(function(s){ return !s.isPoster && !NOISE.test(s.title); }).forEach(function(s){
-    var sc = scoreSession(s, terms);
+    var sc = scoreSession(s, terms) + koHit(sPeople(s));
     if (sc > 0) cand.push({ sc:sc, kind:'session', obj:s, line:sessionLine(s), url:s.url, label:s.title }); });
   P.forEach(function(p){
-    var sc = scorePoster(p, terms);
+    var sc = scorePoster(p, terms) + koHit(p.authors.join(' '));
     if (sc > 0) cand.push({ sc:sc, kind:'poster', obj:p, line:posterLine(p), url:p.url, label:p.num + ' ' + p.title }); });
   cand.sort(function(a,b){ return b.sc - a.sc; });
   cand.slice(0, day ? 14 : 24).forEach(function(c){ push(c.kind, c.obj, c.line, c.url, c.label); });
+  if (TRANS && TRANS.talks && terms.length){
+    var best = null, bestLines = null, bestScore = 0;
+    TRANS.talks.forEach(function(t){
+      var ls = t.lines.filter(function(l){
+        var low = l.s.toLowerCase();
+        return terms.some(function(k){ return k.length > 2 && low.indexOf(k.toLowerCase()) >= 0; });
+      });
+      var sc = ls.length + (termScore(t.title + ' ' + t.speaker, terms) * 3) + koHit(t.speaker);
+      if (sc > bestScore && (ls.length || termScore(t.title + ' ' + t.speaker, terms) > 0)) { bestScore = sc; best = t; bestLines = ls; }
+    });
+    if (best){
+      var head = '[녹취 11월 17일 ' + best.time + ' ' + best.title + ' / ' + best.speaker + '] (AI 자막이라 오인식 가능)';
+      var body = (bestLines.length ? bestLines : best.lines).slice(0, 25).map(function(l){ return l.t + ' ' + l.s; }).join('\n');
+      picked.unshift({ kind:'session', obj:{ id:'tr'+best.id, date:'2026-11-17', time:best.time, room:'B110 (Choi Young Hall)', title:best.title },
+        line: head + '\n' + body.slice(0, 2600), url: TRANS.source, label: best.title });
+    }
+  }
   var ctx = '', used = [];
   for (var i=0;i<picked.length;i++){
     if (ctx.length + picked[i].line.length > 14000) break;
@@ -1055,6 +1105,86 @@ document.getElementById('histlist').addEventListener('click', function(e){
   }
 });
 
+
+
+/* ---------- 한글 이름 검색 ---------- */
+var CHO = ['g','kk','n','d','tt','r','m','b','pp','s','ss','','j','jj','ch','k','t','p','h'];
+var JUNG = ['a','ae','ya','yae','eo','e','yeo','ye','o','wa','wae','oe','yo','u','wo','we','wi','yu','eu','ui','i'];
+var JONG = ['','k','k','k','n','n','n','t','l','l','l','l','l','l','l','l','m','p','p','t','t','ng','t','t','k','t','p','t'];
+var SURNAME = {'김':['kim'],'이':['lee','yi','rhee','i'],'박':['park','bak'],'최':['choi','choe'],'정':['jung','jeong','chung'],
+ '강':['kang'],'조':['cho','jo'],'윤':['yoon','yun'],'장':['jang','chang'],'임':['lim','im','rim'],'한':['han'],'오':['oh','o'],
+ '서':['seo','suh'],'신':['shin','sin'],'권':['kwon'],'황':['hwang'],'안':['ahn','an'],'송':['song'],'유':['yoo','yu'],'홍':['hong'],
+ '전':['jeon','jun','chun'],'고':['ko','go','koh'],'문':['moon','mun'],'손':['son','sohn'],'양':['yang'],'배':['bae'],'백':['baek','paek','back'],
+ '허':['heo','hur','huh'],'남':['nam'],'심':['shim','sim'],'노':['noh','no','roh'],'하':['ha'],'곽':['kwak','gwak'],'성':['sung','seong'],
+ '차':['cha'],'주':['joo','ju'],'우':['woo','wu'],'구':['koo','ku','gu'],'민':['min'],'류':['ryu','yoo'],'진':['jin'],'지':['ji'],
+ '채':['chae'],'원':['won'],'천':['chun','cheon'],'방':['bang'],'공':['kong','gong'],'현':['hyun','hyeon'],'함':['ham'],'변':['byun','byeon'],
+ '여':['yeo'],'추':['chu','choo'],'도':['do','doh'],'소':['so'],'석':['seok','suk'],'설':['seol','sul'],'마':['ma'],'길':['gil','kil'],
+ '연':['yeon'],'표':['pyo'],'라':['ra','la'],'은':['eun'],'제':['je'],'모':['mo'],'반':['ban'],'선':['sun','seon'],'탁':['tak'],'사':['sa'],'복':['bok']};
+function romanSyl(ch){
+  var c = ch.charCodeAt(0) - 0xAC00;
+  if (c < 0 || c > 11171) return '';
+  return CHO[Math.floor(c/588)] + JUNG[Math.floor((c%588)/28)] + JONG[c%28];
+}
+function romanWord(w){ var out=''; for (var i=0;i<w.length;i++) out += romanSyl(w.charAt(i)); return out; }
+function variants(s){
+  var set = [s];
+  var rules = [['yeo','yu'],['eo','u'],['seong','sung'],['jeong','jung'],['eun','un'],['si','shi'],['oo','u'],['ui','i'],['gi','ki'],['ja','jah']];
+  rules.forEach(function(r){
+    set.slice().forEach(function(x){ var y = x.split(r[0]).join(r[1]); if (y !== x && set.indexOf(y) < 0) set.push(y); });
+  });
+  return set.slice(0, 12);
+}
+function koNameKeys(word){
+  if (!/^[가-힣]{2,4}$/.test(word)) return [];
+  var sur = word.charAt(0), given = word.slice(1);
+  var surs = SURNAME[sur] || [romanWord(sur)];
+  var givens = variants(romanWord(given));
+  var keys = [];
+  surs.forEach(function(s){ givens.forEach(function(g){ keys.push(g + s); keys.push(s + g); }); });
+  return keys;
+}
+function flatName(s){ return String(s||'').toLowerCase().replace(/[^a-z]/g,''); }
+
+
+/* ---------- 강연 기록 ---------- */
+var TRANS = null, TROPEN = null;
+function loadTrans(cb){
+  if (TRANS) { cb && cb(); return; }
+  fetch('transcripts.json').then(function(r){ return r.ok ? r.json() : null; }).then(function(j){
+    TRANS = j; renderTrans(); cb && cb();
+  }).catch(function(){ document.getElementById('trnote').textContent = '기록을 불러오지 못했습니다.'; });
+}
+function trLines(t, q){
+  var ls = t.lines;
+  if (q) { var lq = q.toLowerCase(); ls = ls.filter(function(l){ return l.s.toLowerCase().indexOf(lq) >= 0; }); }
+  return ls;
+}
+function renderTrans(){
+  if (!TRANS) return;
+  var q = (document.getElementById('tq').value || '').trim();
+  document.getElementById('trnote').textContent = TRANS.event + ' (' + TRANS.date + ') 실시간 자막 기록입니다. ' + TRANS.note;
+  var out = TRANS.talks.map(function(t){
+    var ls = trLines(t, q);
+    if (q && !ls.length) return '';
+    var open = TROPEN === t.id || !!q;
+    return '<article class="turn"><h3 style="margin:0 0 6px;background:transparent;border:0;padding:0;max-width:none;color:var(--color-ink)">' +
+      esc(t.title) + '</h3>' +
+      '<div class="sub"><span class="num">11/17 ' + esc(t.time) + '</span> · '.replace(' · ', ' ') + esc(t.speaker) + (t.affil ? ', ' + esc(t.affil) : '') + '</div>' +
+      '<div class="sub">' + esc(t.session) + (q ? ', 검색 일치 ' + ls.length + '줄' : ', 자막 ' + t.lines.length + '줄') + '</div>' +
+      '<div class="examples"><button class="btn btn--mini" type="button" data-tr="' + t.id + '">' + (open ? '접기' : '기록 보기') + '</button></div>' +
+      (open ? '<div class="trbody">' + ls.map(function(l){
+        return '<div class="trline"><span class="t">' + esc(l.t) + '</span><span>' + esc(l.s) + '</span></div>'; }).join('') + '</div>' : '') +
+      '</article>';
+  }).join('');
+  document.getElementById('trout').innerHTML = out || '<p class="muted">일치하는 줄이 없습니다.</p>';
+}
+document.getElementById('trout').addEventListener('click', function(e){
+  var b = e.target.closest('[data-tr]'); if (!b) return;
+  TROPEN = (TROPEN === b.dataset.tr) ? null : b.dataset.tr;
+  renderTrans();
+});
+document.getElementById('tq').addEventListener('input', renderTrans);
+loadTrans();
 
 /* ---------- 지도 ---------- */
 var PLACES = [
