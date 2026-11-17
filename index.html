@@ -874,13 +874,15 @@ function sessionLine(s){
     (s.track ? ' (' + s.track + ')' : '') +
     (s.chair ? ' / 좌장 ' + s.chair : '') +
     (s.desc ? ' / 안내: ' + s.desc : '') +
-    (s.talks.length ? '\n  - ' + s.talks.map(function(t){
-      return t.time + ' ' + t.title + (t.speaker ? ' / ' + t.speaker + (t.affil ? ', ' + t.affil : '') : ''); }).join('\n  - ') : '');
+    (s.talks.length ? '\n  - ' + s.talks.slice(0, 6).map(function(t){
+      return t.time + ' ' + t.title + (t.speaker ? ' / ' + t.speaker + (t.affil ? ', ' + t.affil : '') : ''); }).join('\n  - ') +
+      (s.talks.length > 6 ? '\n  - 외 ' + (s.talks.length - 6) + '건' : '') : '');
 }
 function posterLine(p, withAbs){
   var base = '[' + p.num + ' 포스터, ' + POSTER_WHEN + '] ' + p.title + ' / ' + p.authors.join(', ') +
     (p.affils.length ? ' (' + p.affils.join('; ') + ')' : '');
-  if (withAbs){ var a = absOf(p.num); if (a) base += '\n  초록: ' + a.replace(/\n/g,' ').slice(0, 1400); }
+  if (withAbs === 'full'){ var a = absOf(p.num); if (a) base += '\n  초록 전문: ' + a.replace(/\n/g,' ').slice(0, 1600); }
+  else if (withAbs){ var b = absShort(p.num); if (b) base += '\n  초록 첫머리: ' + b; }
   return base;
 }
 function retrieve(q){
@@ -898,7 +900,7 @@ function retrieve(q){
   }
   (q.toUpperCase().match(/\bP\d{3}\b/g) || []).forEach(function(n){
     var hit = P.filter(function(p){ return p.num === n; })[0];
-    if (hit) push('poster', hit, posterLine(hit, true), hit.url, hit.num + ' ' + hit.title);
+    if (hit) push('poster', hit, posterLine(hit, 'full'), hit.url, hit.num + ' ' + hit.title);
   });
   var day = dayFromQ(q);
   if (day){
@@ -924,13 +926,14 @@ function retrieve(q){
   P.forEach(function(p){
     var sc = scorePoster(p, terms) + koHit(p.authors.join(' '));
     if (sc > 0) cand.push({ sc:sc, kind:'poster', obj:p, line:posterLine(p), url:p.url, label:p.num + ' ' + p.title }); });
+  var deep = /초록|요약|자세|내용|방법|결과|무슨 연구|어떤 연구/.test(q);
   cand.sort(function(a,b){ return b.sc - a.sc; });
-  cand.slice(0, day ? 14 : 24).forEach(function(c, i){
+  cand.slice(0, day ? 12 : 18).forEach(function(c, i){
     var line = c.line;
-    if (i < 3 && c.kind === 'poster') line = posterLine(c.obj, true);
-    if (i < 3 && c.kind === 'session' && c.obj.talks){
+    if (c.kind === 'poster' && i < (deep ? 2 : 4)) line = posterLine(c.obj, deep && i === 0 ? 'full' : true);
+    if (deep && i === 0 && c.kind === 'session' && c.obj.talks){
       var extra = '';
-      c.obj.talks.forEach(function(t){ if (!extra){ var a = talkAbsOf(t.title); if (a) extra = '\n  초록(' + t.title.slice(0,60) + '): ' + a.replace(/\n/g,' ').slice(0, 1200); } });
+      c.obj.talks.forEach(function(t){ if (!extra){ var a = talkAbsOf(t.title, true); if (a) extra = '\n  초록(' + t.title.slice(0,60) + '): ' + a.replace(/\n/g,' ').slice(0, 1200); } });
       line += extra;
     }
     push(c.kind, c.obj, line, c.url, c.label);
@@ -954,7 +957,7 @@ function retrieve(q){
   }
   var ctx = '', used = [];
   for (var i=0;i<picked.length;i++){
-    if (ctx.length + picked[i].line.length > 14000) break;
+    if (ctx.length + picked[i].line.length > 9000) break;
     ctx += (ctx ? '\n\n' : '') + picked[i].line; used.push(picked[i]);
   }
   return { ctx:ctx, used:used, day:day, terms:terms };
@@ -1281,10 +1284,12 @@ function loadAbs(cb){
 }
 setTimeout(loadAbs, 1200);
 function absOf(num){ return (ABS && ABS.posters && ABS.posters[num]) ? ABS.posters[num] : ''; }
-function talkAbsOf(title){
+function absShort(num){ return (ABS && ABS.short && ABS.short[num]) ? ABS.short[num] : ''; }
+function talkAbsOf(title, full){
   if (!ABS || !ABS.talks) return '';
   var t = ABS.talks.filter(function(x){ return x.title === title; })[0];
-  return t ? t.text : '';
+  if (!t) return '';
+  return full ? t.text : (t.short || t.text.slice(0, 330));
 }
 
 /* ---------- 시간표 ---------- */
