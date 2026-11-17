@@ -161,6 +161,21 @@ label{font:500 var(--text-sm)/1.3 var(--font-body);color:var(--color-muted);disp
   background:var(--color-sheet);border-left:5px solid var(--color-ink)}
 .ttlegend b.live{border-color:var(--color-accent);border-left-color:var(--color-accent)}
 .ttlegend b.evt{background:var(--color-paper-2);border-left-color:var(--color-rule)}
+.trwarn{margin:var(--space-sm) 0 var(--space-md)}
+.trwarn summary{cursor:pointer;font:500 var(--text-sm)/1.4 var(--font-body);color:var(--color-muted)}
+.trwarn p{margin:var(--space-sm) 0 0}
+.trday{font-family:var(--font-display);font-weight:600;font-size:var(--text-lg);color:var(--color-ink);
+  margin:var(--space-xl) 0 var(--space-sm);padding-bottom:var(--space-xs);
+  border-bottom:var(--rule-bar) solid var(--color-rule-2)}
+.trcard{border-bottom:var(--rule-hair) solid var(--color-rule)}
+.trhead{display:grid;grid-template-columns:70px minmax(0,1fr) 24px;gap:var(--space-md);align-items:start;
+  width:100%;text-align:left;background:transparent;border:0;padding:14px 0;cursor:pointer;font:inherit;color:inherit}
+.trhead:hover{background:var(--color-paper-2)}
+.trhead .ttime{font-family:var(--font-outlier);font-size:13px;color:var(--color-muted);padding-top:3px}
+.trhead .ttitle{font-family:var(--font-display);font-weight:600;font-size:15.5px;line-height:1.35;color:var(--color-ink);display:block}
+.trhead .twho{font-size:13.5px;color:var(--color-muted);margin-top:3px;display:block}
+.trhead .tmark{font-family:var(--font-outlier);color:var(--color-accent);font-size:16px;text-align:right;padding-top:2px}
+.trcard.open .trhead{background:var(--color-paper-2)}
 .trline{display:grid;grid-template-columns:52px minmax(0,1fr);gap:var(--space-md);padding:5px 0;
   border-top:var(--rule-hair) dotted var(--color-rule);font-size:var(--text-sm);line-height:1.55}
 .trline .t{font-family:var(--font-outlier);color:var(--color-muted);font-size:13px}
@@ -398,9 +413,10 @@ footer p{margin:0;font-size:var(--text-sm)}
 
 <section id="view-rec2" class="view hide">
   <h2>강연 기록</h2>
-  <p class="muted" id="trnote">불러오는 중입니다.</p>
+  <p class="muted" id="trnote"></p>
+  <details class="trwarn"><summary>이 기록에 대해</summary><p class="muted" id="trwarn2"></p></details>
   <div class="filters">
-    <div><label for="tq">기록 안에서 검색</label><input type="search" id="tq" placeholder="예: antibody, foundation model, 단어"></div>
+    <div><label for="tq">기록 안에서 검색</label><input type="search" id="tq" placeholder="예: antibody, foundation model"></div>
   </div>
   <div id="trout"></div>
 </section>
@@ -1232,11 +1248,13 @@ function renderDays(){
 function renderGrid(){
   var day = gridDay();
   renderDays();
-  var list = S.filter(function(s){ return s.date === day && !/^Poster Viewing$/.test(s.title); });
+  var all = S.filter(function(s){ return s.date === day && !/^Poster Viewing$/.test(s.title); });
+  var noroom = all.filter(function(s){ return !s.room; });
+  var list = all.filter(function(s){ return !!s.room; });
   if (!list.length){ document.getElementById('ttout').innerHTML = '<p class="muted">일정이 없습니다.</p>'; return; }
   var rooms = [];
   ROOM_ORDER.forEach(function(r){ if (list.some(function(s){ return (s.room||'') === r; })) rooms.push(r); });
-  list.forEach(function(s){ var r = s.room || '(장소 미정)'; if (rooms.indexOf(r) < 0) rooms.push(r); });
+  list.forEach(function(s){ if (rooms.indexOf(s.room) < 0) rooms.push(s.room); });
   var minA = 24*60, maxB = 0;
   list.forEach(function(s){ var p = spanOf(s); if (p.a < minA) minA = p.a; if (p.b > maxB) maxB = p.b; });
   minA = Math.floor(minA/30)*30; maxB = Math.ceil(maxB/30)*30;
@@ -1253,7 +1271,7 @@ function renderGrid(){
   var nw = nowMin();
   var body = '<div class="ttcol tttime" style="height:' + H + 'px;border-left:0">' + ticksLab + '</div>';
   rooms.forEach(function(r){
-    var items = list.filter(function(s){ return (s.room || '(장소 미정)') === r; })
+    var items = list.filter(function(s){ return s.room === r; })
       .sort(function(a,b){ return spanOf(a).a - spanOf(b).a; });
     var lanes = [];
     items.forEach(function(s){
@@ -1286,8 +1304,10 @@ function renderGrid(){
   }
   document.getElementById('gridnote').textContent = dayLabel(day) + ', 세션 ' + list.length + '개' +
     (day === nw.iso ? ', 한국 시간 ' + nw.label + ' 기준' : '');
+  var extra = noroom.length ? '<p class="muted" style="margin-top:12px">공식 프로그램에 장소가 안 적힌 일정: ' +
+    noroom.map(function(s){ return esc(s.time + ' ' + s.title); }).join(' / ') + '</p>' : '';
   document.getElementById('ttout').innerHTML =
-    '<div class="ttgrid" style="grid-template-columns:' + cols + '">' + head + body + '</div>' + nowLine;
+    '<div class="ttgrid" style="grid-template-columns:' + cols + '">' + head + body + '</div>' + nowLine + extra;
   if (day === nw.iso && nw.min >= minA && nw.min <= maxB){
     var box = document.getElementById('ttout');
     var y = (nw.min - minA) * PXMIN - 160;
@@ -1325,20 +1345,26 @@ function trLines(t, q){
 function renderTrans(){
   if (!TRANS) return;
   var q = (document.getElementById('tq').value || '').trim();
-  document.getElementById('trnote').textContent = TRANS.event + ' (' + TRANS.date + ') 실시간 자막 기록입니다. ' + TRANS.note;
-  var out = TRANS.talks.map(function(t){
+  document.getElementById('trnote').textContent =
+    TRANS.event + ', ' + TRANS.date + '. 강연 ' + TRANS.talks.length + '개의 실시간 자막입니다.';
+  document.getElementById('trwarn2').textContent = TRANS.note;
+  var out = '', lastSession = '';
+  TRANS.talks.forEach(function(t){
     var ls = trLines(t, q);
-    if (q && !ls.length) return '';
+    if (q && !ls.length) return;
+    if (t.session !== lastSession){ lastSession = t.session; out += '<h3 class="trday">' + esc(t.session) + '</h3>'; }
     var open = TROPEN === t.id || !!q;
-    return '<article class="turn"><h3 style="margin:0 0 6px;background:transparent;border:0;padding:0;max-width:none;color:var(--color-ink)">' +
-      esc(t.title) + '</h3>' +
-      '<div class="sub"><span class="num">11/17 ' + esc(t.time) + '</span> · '.replace(' · ', ' ') + esc(t.speaker) + (t.affil ? ', ' + esc(t.affil) : '') + '</div>' +
-      '<div class="sub">' + esc(t.session) + (q ? ', 검색 일치 ' + ls.length + '줄' : ', 자막 ' + t.lines.length + '줄') + '</div>' +
-      '<div class="examples"><button class="btn btn--mini" type="button" data-tr="' + t.id + '">' + (open ? '접기' : '기록 보기') + '</button></div>' +
+    out += '<div class="trcard' + (open ? ' open' : '') + '">' +
+      '<button class="trhead" type="button" data-tr="' + t.id + '" aria-expanded="' + (open ? 'true' : 'false') + '">' +
+      '<span class="ttime">' + esc(t.time) + '</span>' +
+      '<span><span class="ttitle">' + esc(t.title) + '</span>' +
+      '<span class="twho">' + esc(t.speaker) + (t.affil ? ', ' + esc(t.affil) : '') + ' | ' +
+      (q ? '일치 ' + ls.length + '줄' : '자막 ' + t.lines.length + '줄') + '</span></span>' +
+      '<span class="tmark">' + (open ? '\u2212' : '+') + '</span></button>' +
       (open ? '<div class="trbody">' + ls.map(function(l){
-        return '<div class="trline"><span class="t">' + esc(l.t) + '</span><span>' + esc(l.s) + '</span></div>'; }).join('') + '</div>' : '') +
-      '</article>';
-  }).join('');
+        return '<div class="trline"><span class="t">' + esc(l.t) + '</span><span>' + esc(l.s) + '</span></div>';
+      }).join('') + '</div>' : '') + '</div>';
+  });
   document.getElementById('trout').innerHTML = out || '<p class="muted">일치하는 줄이 없습니다.</p>';
 }
 document.getElementById('trout').addEventListener('click', function(e){
