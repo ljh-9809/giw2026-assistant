@@ -554,7 +554,8 @@ function scoreSession(s, terms){
 }
 function scorePoster(p, terms){
   var who = p.authors.join(' ')+' '+p.affils.join(' ');
-  var sc = termScore(p.title, terms)*3 + termScore(who, terms) + nameBonus(p.authors.join(' '), terms);
+  var sc = termScore(p.title, terms)*3 + termScore(who, terms) + nameBonus(p.authors.join(' '), terms)
+    + termScore(p.num, terms) * 10;
   var a = absOf(p.num);
   if (a) sc += Math.min(4, termScore(a, terms));
   return sc;
@@ -895,6 +896,10 @@ function retrieve(q){
     P.filter(function(p){ return mine.indexOf(p.num) >= 0; }).forEach(function(p){
       push('poster', p, posterLine(p), p.url, p.num + ' ' + p.title); });
   }
+  (q.toUpperCase().match(/\bP\d{3}\b/g) || []).forEach(function(n){
+    var hit = P.filter(function(p){ return p.num === n; })[0];
+    if (hit) push('poster', hit, posterLine(hit, true), hit.url, hit.num + ' ' + hit.title);
+  });
   var day = dayFromQ(q);
   if (day){
     S.filter(function(s){ return s.date===day && !s.isPoster && !NOISE.test(s.title); })
