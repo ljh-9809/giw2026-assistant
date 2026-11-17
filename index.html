@@ -1553,7 +1553,7 @@ function paintOwner(){
   var own = document.getElementById('mineowner');
   if (own) own.textContent = (name ? name + '님이 담은 세션과 포스터를 ' : '담기를 누른 세션과 포스터를 ') + '학회 일정 순서대로 보여줍니다.';
   var tab = document.querySelector('#views button[data-view="mine"]');
-  if (tab) tab.textContent = marks.length ? '즐겨찾기 ' + marks.length : '즐겨찾기';
+  if (tab) tab.textContent = marks.length ? '즐겨찾기 (' + marks.length + ')' : '즐겨찾기';
 }
 
 /* ---------- 시작 ---------- */
