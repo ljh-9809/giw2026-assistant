@@ -960,8 +960,25 @@ function retrieve(q){
     if (ctx.length + picked[i].line.length > 9000) break;
     ctx += (ctx ? '\n\n' : '') + picked[i].line; used.push(picked[i]);
   }
+  if (!ctx){
+    if (LASTCTX){ ctx = LASTCTX; used = LASTUSED.slice(); }
+    else {
+      var nw2 = nowMin();
+      var d2 = (DAYS.indexOf(nw2.iso) >= 0) ? nw2.iso : DAYS[0];
+      S.filter(function(s){ return s.date === d2 && !s.isPoster && !NOISE.test(s.title); })
+       .sort(function(a,b){ return a.time.localeCompare(b.time); })
+       .forEach(function(s){
+         if (ctx.length > 7000) return;
+         ctx += (ctx ? '\n\n' : '') + sessionLine(s);
+         used.push({ kind:'session', obj:s, line:sessionLine(s), url:s.url, label:s.title });
+       });
+      day = day || d2;
+    }
+  }
+  LASTCTX = ctx; LASTUSED = used.slice();
   return { ctx:ctx, used:used, day:day, terms:terms };
 }
+var LASTCTX = '', LASTUSED = [];
 var chat = document.getElementById('chat');
 var CHAT = [];
 function mdToHtml(t){
@@ -1014,6 +1031,8 @@ var SYS = '너는 BIOINFO/GIW ISCB-Asia 2026 학회(2026년 11월 17일-20일, �
   '매 질문 맨 위에 [오늘] 날짜가 붙으니 "오늘", "내일" 같은 말은 그 날짜로 계산해라. ' +
   '학회 데이터에 그 날 일정이 붙어 있으면 그것이 그 날의 전체 일정이다. ' +
   '[시간대]가 주어지면 그 시간에 걸치는 일정만 골라라. 오전을 물었는데 오후 일정을 섞거나 그 반대로 하지 마라. ' +
+  '자료가 붙었는지 여부, 데이터가 비었다는 사정 같은 내부 사정은 절대 말하지 마라. 앞 대화에 이미 나온 내용으로 이어서 답하면 된다. ' +
+  '정말 모르는 정보면 "그건 학회 프로그램에 없어요"처럼 사실만 짧게 말하라. ' +
   '짧게, 목록은 간결하게.';
 function fallbackText(used){
   if (!used.length) return '데이터에서 관련된 것을 찾지 못했습니다. 다른 낱말로 물어봐 주세요.';
@@ -1131,7 +1150,7 @@ document.getElementById('ask').addEventListener('keydown', function(e){
 });
 document.getElementById('newchat').onclick = function(){
   if (BUSY) { BUSY.abort(); BUSY = null; setBusy(false); }
-  CHAT.length = 0; chat.innerHTML = ''; CUR = null;
+  CHAT.length = 0; chat.innerHTML = ''; CUR = null; LASTCTX = ''; LASTUSED = [];
   document.getElementById('intro').classList.remove('hide');
   document.getElementById('histlist').classList.add('hide');
   paintHistNow();
