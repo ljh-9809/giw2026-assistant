@@ -428,6 +428,7 @@ footer p{margin:0;font-size:var(--text-sm)}
   <div class="filters">
     <div><label for="tq">기록 안에서 검색</label><input type="search" id="tq" placeholder="예: antibody, foundation model"></div>
   </div>
+  <div id="liveout"></div>
   <div id="trout"></div>
 </section>
 
@@ -1434,6 +1435,61 @@ document.getElementById('daypick').addEventListener('click', function(e){
 });
 
 setInterval(function(){ if (!document.getElementById('view-prog').classList.contains('hide') && !document.getElementById('gridwrap').classList.contains('hide')) renderGrid(); }, 60000);
+
+
+/* ---------- 오늘 실시간 자막 ---------- */
+var LIVEROOMS = [
+  { id:'centennial', name:'백주년기념관 (The Centennial Hall)' },
+  { id:'grandballroom', name:'그랜드볼룸 (B125-126)' },
+  { id:'choiyoung', name:'최영홀 (B110)' }
+];
+var LIVEOPEN = null, LIVEDATA = {};
+function todayISO(){
+  var d = new Date(new Date().toLocaleString('en-US', { timeZone:'Asia/Seoul' }));
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function liveEp(){ return location.hostname.indexOf('vercel.app') >= 0 ? '/api/caption' : 'https://giw2026-assistant.vercel.app/api/caption'; }
+function loadLive(room, cb){
+  fetch(liveEp() + '?room=' + room + '&date=' + todayISO())
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){ if (j){ LIVEDATA[room] = j; } cb && cb(); renderLive(); })
+    .catch(function(){ cb && cb(); });
+}
+function renderLive(){
+  var box = document.getElementById('liveout');
+  if (!box) return;
+  var today = todayISO();
+  var html = '<h3 class="trday">오늘(' + today.slice(5).replace('-','월 ') + '일) 실시간 자막</h3>' +
+    '<p class="muted">학회 통역 시스템에서 자동으로 받아 모읍니다. 끝난 강연은 아래 정리된 기록으로 올라갑니다.</p>';
+  LIVEROOMS.forEach(function(r){
+    var d = LIVEDATA[r.id];
+    var n = d ? d.count : null;
+    var open = LIVEOPEN === r.id;
+    html += '<div class="trcard' + (open ? ' open' : '') + '">' +
+      '<button class="trhead" type="button" data-live="' + r.id + '">' +
+      '<span class="ttime">LIVE</span>' +
+      '<span><span class="ttitle">' + esc(r.name) + '</span>' +
+      '<span class="twho">' + (n === null ? '불러오는 중' : n + '줄 기록됨') + '</span></span>' +
+      '<span class="trtoggle"><b>' + (open ? '\u2212' : '+') + '</b>' + (open ? '접기' : '보기') + '</span></button>';
+    if (open && d && d.lines.length){
+      var ls = d.lines.slice(-400);
+      html += '<div class="trbody">' + ls.map(function(l){
+        return '<div class="trline"><span class="t">' + esc(l.t) + '</span><span>' + esc(l.s) + '</span></div>';
+      }).join('') + '</div>';
+    } else if (open){
+      html += '<p class="muted" style="padding:0 0 14px">아직 기록이 없습니다. 해당 방에서 발표가 시작되면 쌓입니다.</p>';
+    }
+    html += '</div>';
+  });
+  box.innerHTML = html;
+}
+document.getElementById('liveout').addEventListener('click', function(e){
+  var b = e.target.closest('[data-live]'); if (!b) return;
+  LIVEOPEN = (LIVEOPEN === b.dataset.live) ? null : b.dataset.live;
+  if (LIVEOPEN) loadLive(LIVEOPEN); else renderLive();
+});
+LIVEROOMS.forEach(function(r){ loadLive(r.id); });
+setInterval(function(){ if (LIVEOPEN && !document.getElementById('view-rec2').classList.contains('hide')) loadLive(LIVEOPEN); }, 60000);
 
 /* ---------- 강연 기록 ---------- */
 var TRANS = null, TROPEN = null, TRFULL = null;
