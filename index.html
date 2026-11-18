@@ -1459,6 +1459,9 @@ var LIVEJUNK = /(Translated text is fully available|Voice translation is only av
 function renderLive(){
   var box = document.getElementById('liveout');
   if (!box) return;
+  var prevBody = box.querySelector('.trbody');
+  var keepTop = prevBody ? prevBody.scrollTop : 0;
+  var atBottom = prevBody ? (prevBody.scrollHeight - prevBody.scrollTop - prevBody.clientHeight < 60) : true;
   var today = todayISO();
   var html = '<h3 class="trday">오늘(' + today.slice(5).replace('-','월 ') + '일) 실시간 자막</h3>' +
     '<p class="muted">학회 통역 시스템에서 자동으로 받아 모읍니다. 끝난 강연은 아래 정리된 기록으로 올라갑니다.</p>';
@@ -1468,7 +1471,7 @@ function renderLive(){
     var open = LIVEOPEN === r.id;
     html += '<div class="trcard' + (open ? ' open' : '') + '">' +
       '<button class="trhead" type="button" data-live="' + r.id + '">' +
-      '<span class="ttime">LIVE</span>' +
+      '<span class="ttime">' + (open ? 'LIVE \u25CF' : 'LIVE') + '</span>' +
       '<span><span class="ttitle">' + esc(r.name) + '</span>' +
       '<span class="twho">' + (n === null ? '불러오는 중' : (d.lines.filter(function(l){ return !LIVEJUNK.test(l.s); }).length) + '줄 기록됨') + '</span></span>' +
       '<span class="trtoggle"><b>' + (open ? '\u2212' : '+') + '</b>' + (open ? '접기' : '보기') + '</span></button>';
@@ -1483,6 +1486,8 @@ function renderLive(){
     html += '</div>';
   });
   box.innerHTML = html;
+  var nb = box.querySelector('.trbody');
+  if (nb){ nb.scrollTop = atBottom ? nb.scrollHeight : keepTop; }
 }
 document.getElementById('liveout').addEventListener('click', function(e){
   var b = e.target.closest('[data-live]'); if (!b) return;
@@ -1490,7 +1495,15 @@ document.getElementById('liveout').addEventListener('click', function(e){
   if (LIVEOPEN) loadLive(LIVEOPEN); else renderLive();
 });
 LIVEROOMS.forEach(function(r){ loadLive(r.id); });
-setInterval(function(){ if (LIVEOPEN && !document.getElementById('view-rec2').classList.contains('hide')) loadLive(LIVEOPEN); }, 60000);
+function liveTick(){
+  if (!LIVEOPEN) return;
+  var v = document.getElementById('view-rec2');
+  if (!v || v.classList.contains('hide')) return;
+  if (document.hidden) return;
+  loadLive(LIVEOPEN);
+}
+setInterval(liveTick, 4000);
+document.addEventListener('visibilitychange', function(){ if (!document.hidden) liveTick(); });
 
 /* ---------- 강연 기록 ---------- */
 var TRANS = null, TROPEN = null, TRFULL = null;
