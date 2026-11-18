@@ -290,6 +290,7 @@ footer p{margin:0;font-size:var(--text-sm)}
   table.refs td.pick,table.list td.pick{width:90px}
 }
 @media (prefers-reduced-motion:reduce){*{animation:none!important;scroll-behavior:auto!important}}
+.trko{display:block;color:var(--ink-3);font-size:.9em;margin-top:3px}
 </style>
 <script src="https://accounts.google.com/gsi/client" async defer onload="window.gsiReady&&window.gsiReady()"></script>
 </head>
@@ -1478,7 +1479,7 @@ function renderLive(){
     if (open && d && d.lines.length){
       var ls = d.lines.filter(function(l){ return !LIVEJUNK.test(l.s); }).slice(-400);
       html += '<div class="trbody">' + ls.map(function(l){
-        return '<div class="trline"><span class="t">' + esc(l.t) + '</span><span>' + esc(l.s) + '</span></div>';
+        return '<div class="trline"><span class="t">' + esc(l.t) + '</span><span>' + esc(l.s) + (l.ko ? '<span class="trko">' + esc(l.ko) + '</span>' : '') + '</span></div>';
       }).join('') + '</div>';
     } else if (open){
       html += '<p class="muted" style="padding:0 0 14px">아직 기록이 없습니다. 해당 방에서 발표가 시작되면 쌓입니다.</p>';
@@ -1504,6 +1505,84 @@ function liveTick(){
 }
 setInterval(liveTick, 4000);
 document.addEventListener('visibilitychange', function(){ if (!document.hidden) liveTick(); });
+
+
+/* ---------- 자막 수집기 (앱이 열려 있으면 백그라운드로 돈다) ---------- */
+var CAPROOMS = ['centennial','grandballroom','choiyoung'];
+var CAPID = Math.random().toString(36).slice(2) + Date.now();
+var capSockets = [], capBuf = {}, capOn = false;
+function capInWindow(){
+  var d = new Date(new Date().toLocaleString('en-US', { timeZone:'Asia/Seoul' }));
+  var iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  if (iso < '2026-11-17' || iso > '2026-11-20') return false;
+  var h = d.getHours();
+  return h >= 8 && h < 21;
+}
+function capLeader(){
+  try {
+    var raw = localStorage.getItem('giw26_caplock');
+    var v = raw ? JSON.parse(raw) : null;
+    var now = Date.now();
+    if (!v || !v.ts || now - v.ts > 25000 || v.id === CAPID){
+      localStorage.setItem('giw26_caplock', JSON.stringify({ id: CAPID, ts: now }));
+      return true;
+    }
+    return false;
+  } catch(e){ return true; }
+}
+function capStamp(sec){
+  var ms = sec ? (sec > 1e12 ? sec : sec * 1000) : Date.now();
+  var d = new Date(new Date(ms).toLocaleString('en-US', { timeZone:'Asia/Seoul' }));
+  return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+}
+function capFlush(){
+  CAPROOMS.forEach(function(room){
+    var b = capBuf[room];
+    if (!b || !b.length) return;
+    var batch = b.splice(0, 150);
+    fetch(liveEp(), { method:'POST', headers:{'content-type':'application/json'},
+      body: JSON.stringify({ room: room, date: todayISO(), lines: batch })
+    }).catch(function(){ capBuf[room] = batch.concat(capBuf[room] || []); });
+  });
+}
+function capConnect(){
+  if (capOn || typeof io === 'undefined') return;
+  capOn = true;
+  CAPROOMS.forEach(function(room){
+    capBuf[room] = capBuf[room] || [];
+    var sk = io('https://kr.giw-' + room + '.mangople.com', { transports:['websocket','polling'], reconnection:true });
+    sk.on('connect', function(){ sk.emit('join_room', { room:'default' }); });
+    function take(d){
+      if (!d || d.is_final === false) return;
+      var en = (d.original || '').trim();
+      var ko = d.translation && (d.translation['ko-KR'] || d.translation.ko);
+      if (!en && !ko) return;
+      var line = { t: capStamp(d.timestamp), s: en || ko, k: 'en' };
+      if (ko && ko.trim() && ko.trim() !== en) line.ko = ko.trim();
+      var b = capBuf[room];
+      if (b.length && b[b.length-1].s === line.s) { b[b.length-1] = line; return; }
+      b.push(line);
+    }
+    sk.on('translation_result', take);
+    sk.on('transcription', function(d){ if (d && d.is_final) take(d); });
+    sk.on('translation_result_batch', function(d){
+      var arr = (d && (d.items || d.results)) || [];
+      arr.forEach(take);
+    });
+    capSockets.push(sk);
+  });
+  setInterval(capFlush, 10000);
+}
+function capBoot(){
+  if (capOn || !capInWindow() || !capLeader()) return;
+  if (typeof io !== 'undefined') { capConnect(); return; }
+  var s = document.createElement('script');
+  s.src = 'https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js';
+  s.onload = capConnect;
+  document.head.appendChild(s);
+}
+setInterval(function(){ if (capInWindow() && capLeader()) capBoot(); }, 15000);
+setTimeout(capBoot, 2500);
 
 /* ---------- 강연 기록 ---------- */
 var TRANS = null, TROPEN = null, TRFULL = null;
