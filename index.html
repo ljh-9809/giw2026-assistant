@@ -1451,10 +1451,20 @@ function todayISO(){
 }
 function liveEp(){ return location.hostname.indexOf('vercel.app') >= 0 ? '/api/caption' : 'https://giw2026-assistant.vercel.app/api/caption'; }
 function loadLive(room, cb){
+  function localPack(){
+    var l = (typeof capLocalGet === 'function') ? capLocalGet(room, todayISO()) : [];
+    return l.length ? { room: room, date: todayISO(), count: l.length, lines: l } : null;
+  }
   fetch(liveEp() + '?room=' + room + '&date=' + todayISO())
     .then(function(r){ return r.ok ? r.json() : null; })
-    .then(function(j){ if (j){ LIVEDATA[room] = j; } cb && cb(); renderLive(); })
-    .catch(function(){ cb && cb(); });
+    .then(function(j){
+      var loc = localPack();
+      if (j && j.lines && j.lines.length) { LIVEDATA[room] = (loc && loc.count > j.lines.length) ? loc : j; }
+      else if (loc) { LIVEDATA[room] = loc; }
+      else if (j) { LIVEDATA[room] = j; }
+      cb && cb(); renderLive();
+    })
+    .catch(function(){ var loc = localPack(); if (loc) LIVEDATA[room] = loc; cb && cb(); renderLive(); });
 }
 var LIVEJUNK = /(Translated text is fully available|Voice translation is only available|earphones or Bluetooth|Tap to keep screen|choose a language that also offers audio|음성 번역은|이어폰|화면 켜짐)/i;
 function renderLive(){
@@ -1535,11 +1545,25 @@ function capStamp(sec){
   var d = new Date(new Date(ms).toLocaleString('en-US', { timeZone:'Asia/Seoul' }));
   return String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 }
+/* 저장소(블롭) 쿼터가 막혔을 때도 자막을 잃지 않도록 브라우저에도 남긴다 */
+function capLocalKey(room, date){ return 'giw26_caplines_' + room + '_' + date; }
+function capLocalGet(room, date){
+  try { var raw = localStorage.getItem(capLocalKey(room, date)); var a = raw ? JSON.parse(raw) : []; return Array.isArray(a) ? a : []; } catch(e){ return []; }
+}
+function capLocalPut(room, date, batch){
+  try {
+    var prev = capLocalGet(room, date), seen = {};
+    prev.forEach(function(l){ seen[l.t + '|' + l.s] = 1; });
+    batch.forEach(function(l){ var k = l.t + '|' + l.s; if (!seen[k]){ seen[k] = 1; prev.push(l); } });
+    localStorage.setItem(capLocalKey(room, date), JSON.stringify(prev.slice(-4000)));
+  } catch(e){}
+}
 function capFlush(){
   CAPROOMS.forEach(function(room){
     var b = capBuf[room];
     if (!b || !b.length) return;
     var batch = b.splice(0, 150);
+    capLocalPut(room, todayISO(), batch);
     fetch(liveEp(), { method:'POST', headers:{'content-type':'application/json'},
       body: JSON.stringify({ room: room, date: todayISO(), lines: batch })
     }).catch(function(){ capBuf[room] = batch.concat(capBuf[room] || []); });
