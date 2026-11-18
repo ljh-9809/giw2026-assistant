@@ -1455,6 +1455,7 @@ function loadLive(room, cb){
     .then(function(j){ if (j){ LIVEDATA[room] = j; } cb && cb(); renderLive(); })
     .catch(function(){ cb && cb(); });
 }
+var LIVEJUNK = /(Translated text is fully available|Voice translation is only available|earphones or Bluetooth|Tap to keep screen|choose a language that also offers audio|음성 번역은|이어폰|화면 켜짐)/i;
 function renderLive(){
   var box = document.getElementById('liveout');
   if (!box) return;
@@ -1469,10 +1470,10 @@ function renderLive(){
       '<button class="trhead" type="button" data-live="' + r.id + '">' +
       '<span class="ttime">LIVE</span>' +
       '<span><span class="ttitle">' + esc(r.name) + '</span>' +
-      '<span class="twho">' + (n === null ? '불러오는 중' : n + '줄 기록됨') + '</span></span>' +
+      '<span class="twho">' + (n === null ? '불러오는 중' : (d.lines.filter(function(l){ return !LIVEJUNK.test(l.s); }).length) + '줄 기록됨') + '</span></span>' +
       '<span class="trtoggle"><b>' + (open ? '\u2212' : '+') + '</b>' + (open ? '접기' : '보기') + '</span></button>';
     if (open && d && d.lines.length){
-      var ls = d.lines.slice(-400);
+      var ls = d.lines.filter(function(l){ return !LIVEJUNK.test(l.s); }).slice(-400);
       html += '<div class="trbody">' + ls.map(function(l){
         return '<div class="trline"><span class="t">' + esc(l.t) + '</span><span>' + esc(l.s) + '</span></div>';
       }).join('') + '</div>';
