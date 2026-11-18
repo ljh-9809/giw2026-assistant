@@ -60,7 +60,9 @@ export default async function handler(req, res) {
       const s = l.s.slice(0, 600).trim();
       if (!s || seen[t + '|' + s]) return;
       seen[t + '|' + s] = 1;
-      add.push({ t: t, s: s, k: l.k === 'ko' ? 'ko' : 'en' });
+      const rec = { t: t, s: s, k: l.k === 'ko' ? 'ko' : 'en' };
+      if (typeof l.ko === 'string' && l.ko.trim() && l.ko.trim() !== s) rec.ko = l.ko.trim().slice(0, 600);
+      add.push(rec);
     });
     if (!add.length) return res.status(200).json({ ok: true, added: 0, total: prev.length });
     const merged = collapse(prev.concat(add)).slice(-6000);
