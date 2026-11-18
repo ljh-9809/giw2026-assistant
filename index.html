@@ -430,6 +430,7 @@ footer p{margin:0;font-size:var(--text-sm)}
     <div><label for="tq">기록 안에서 검색</label><input type="search" id="tq" placeholder="예: antibody, foundation model"></div>
   </div>
   <div id="liveout"></div>
+  <p class="muted" style="margin:-4px 0 18px"><button id="capdl" class="btn-plain" type="button">오늘 자막 파일로 저장</button></p>
   <div id="trout"></div>
 </section>
 
@@ -1500,6 +1501,24 @@ function renderLive(){
   var nb = box.querySelector('.trbody');
   if (nb){ nb.scrollTop = atBottom ? nb.scrollHeight : keepTop; }
 }
+(function(){
+  var dl = document.getElementById('capdl');
+  if (!dl) return;
+  dl.addEventListener('click', function(){
+    var date = todayISO(), out = {};
+    LIVEROOMS.forEach(function(r){
+      var loc = (typeof capLocalGet === 'function') ? capLocalGet(r.id, date) : [];
+      var srv = (LIVEDATA[r.id] && LIVEDATA[r.id].lines) || [];
+      out[r.id] = (loc.length >= srv.length ? loc : srv);
+    });
+    var blob = new Blob([JSON.stringify({ date: date, rooms: out }, null, 1)], { type:'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'giw-captions-' + date + '.json';
+    a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 4000);
+  });
+})();
 document.getElementById('liveout').addEventListener('click', function(e){
   var b = e.target.closest('[data-live]'); if (!b) return;
   LIVEOPEN = (LIVEOPEN === b.dataset.live) ? null : b.dataset.live;
@@ -1558,6 +1577,12 @@ function capLocalPut(room, date, batch){
     localStorage.setItem(capLocalKey(room, date), JSON.stringify(prev.slice(-4000)));
   } catch(e){}
 }
+function capLocalOnly(){
+  CAPROOMS.forEach(function(room){
+    var b = capBuf[room];
+    if (b && b.length) capLocalPut(room, todayISO(), b);
+  });
+}
 function capFlush(){
   CAPROOMS.forEach(function(room){
     var b = capBuf[room];
@@ -1595,7 +1620,8 @@ function capConnect(){
     });
     capSockets.push(sk);
   });
-  setInterval(capFlush, 10000);
+  setInterval(capLocalOnly, 8000);
+  setInterval(capFlush, 150000);
 }
 function capBoot(){
   if (capOn || !capInWindow() || !capLeader()) return;
