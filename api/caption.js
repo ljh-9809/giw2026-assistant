@@ -8,6 +8,21 @@ function cors(res){
   res.setHeader('Access-Control-Allow-Headers', 'content-type');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
 }
+
+// 커지는 중간 자막(앞부분이 같은 줄)은 마지막 것만 남긴다
+function collapse(lines){
+  const out = [];
+  for (const l of lines){
+    const p = out.length ? out[out.length - 1] : null;
+    if (p && p.k === l.k){
+      if (l.s.startsWith(p.s)) { out[out.length - 1] = l; continue; }
+      if (p.s.startsWith(l.s)) { continue; }
+    }
+    out.push(l);
+  }
+  return out;
+}
+
 function pathOf(room, date){ return "live/" + room + "-" + date + ".json"; }
 async function readAll(pathname){
   try {
@@ -29,7 +44,7 @@ export default async function handler(req, res) {
   const pathname = pathOf(room, date);
 
   if (req.method === 'GET'){
-    const lines = await readAll(pathname);
+    const lines = collapse(await readAll(pathname));
     return res.status(200).json({ room, date, count: lines.length, lines });
   }
   if (req.method === 'POST'){
@@ -48,7 +63,7 @@ export default async function handler(req, res) {
       add.push({ t: t, s: s, k: l.k === 'ko' ? 'ko' : 'en' });
     });
     if (!add.length) return res.status(200).json({ ok: true, added: 0, total: prev.length });
-    const merged = prev.concat(add).slice(-6000);
+    const merged = collapse(prev.concat(add)).slice(-6000);
     await put(pathname, JSON.stringify({ room: room, date: date, lines: merged, updated: Date.now() }), {
       access: 'private', contentType: 'application/json', addRandomSuffix: false, allowOverwrite: true,
       token: process.env.BLOB_READ_WRITE_TOKEN,
