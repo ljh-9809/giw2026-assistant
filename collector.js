@@ -17,7 +17,11 @@
       var key = (ko ? 'k' : 'e') + '|' + s;
       if (seen[key]) return;
       seen[key] = 1;
-      window.__giwCap.buf.push({ t: stamp(), s: s, k: ko ? 'ko' : 'en' });
+      var b = window.__giwCap.buf, last = b.length ? b[b.length-1] : null;
+      var kk = ko ? 'ko' : 'en';
+      if (last && last.k === kk && s.indexOf(last.s) === 0) { b[b.length-1] = { t: last.t, s: s, k: kk }; return; }
+      if (last && last.k === kk && last.s.indexOf(s) === 0) return;
+      b.push({ t: stamp(), s: s, k: kk });
     });
   }
   new MutationObserver(grab).observe(document.body, { childList:true, subtree:true, characterData:true });
