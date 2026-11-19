@@ -63,6 +63,8 @@ export default async function handler(req) {
         .filter((m) => m && (m.role === 'user' || m.role === 'assistant') && m.content)
         .map((m) => ({ role: m.role, content: String(m.content).slice(0, MAX_CONTEXT) }))
     : [{ role: 'user', content: '학회 데이터:\n' + context + '\n\n질문: ' + question }];
+  /* 클라이언트가 대화를 자르다 보면 앞머리가 assistant 로 시작한다. 그러면 API 가 통째로 거절한다. */
+  while (messages.length && messages[0].role !== 'user') messages.shift();
   if (!messages.length || messages[0].role !== 'user') return json({ answer: '질문이 비었어요.' }, 400);
 
   const wantStream = body.stream !== false;

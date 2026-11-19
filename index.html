@@ -931,11 +931,6 @@ function retrieve(q){
     if (hit) push('poster', hit, posterLine(hit, 'full'), hit.url, hit.num + ' ' + hit.title);
   });
   var day = dayFromQ(q);
-  if (day){
-    S.filter(function(s){ return s.date===day && !s.isPoster && !NOISE.test(s.title); })
-     .sort(function(a,b){ return a.time.localeCompare(b.time); })
-     .forEach(function(s){ push('session', s, sessionLine(s), s.url, s.title); });
-  }
   var koKeys = [];
   (q.match(/[가-힣]{2,4}/g) || []).forEach(function(w){
     if (KO[w] || KO_STOP.test(w)) return;
@@ -966,6 +961,13 @@ function retrieve(q){
     }
     push(c.kind, c.obj, line, c.url, c.label);
   });
+  /* 날짜가 섞인 질문("11월 18일 17:00 ... 이건 뭐냐")은 그 날 일정 전체에 묻혀버렸다.
+     그래서 점수 높은 것들을 먼저 넣고, 그 날 일정은 남는 자리만 채운다. push 가 중복을 거른다. */
+  if (day){
+    S.filter(function(s){ return s.date===day && !s.isPoster && !NOISE.test(s.title); })
+     .sort(function(a,b){ return a.time.localeCompare(b.time); })
+     .forEach(function(s){ push('session', s, sessionLine(s), s.url, s.title); });
+  }
   if (TRANS && TRANS.talks && terms.length){
     var best = null, bestLines = null, bestScore = 0;
     TRANS.talks.forEach(function(t){
@@ -1109,6 +1111,8 @@ function askWith(q){
     (tod ? '\n[이 질문이 가리키는 시간대] ' + tod : '') + '\n\n';
   var userMsg = dateLine + '[현장 안내]\n' + infoLine + '\n\n' + (r.ctx ? '[학회 데이터]\n'+r.ctx+'\n\n' : '') + '[질문] ' + q;
   var outgoing = CHAT.concat([{ role:'user', content:userMsg }]).slice(-12);
+  /* 잘린 앞머리가 assistant 면 API 가 통째로 거절한다 (대화 7번째부터 터졌다) */
+  while (outgoing.length > 1 && outgoing[0].role !== 'user') outgoing.shift();
   var defaultEp = location.hostname.indexOf('vercel.app') >= 0 ? '/api/ask' : 'https://giw2026-assistant.vercel.app/api/ask';
   var ep = LS.get('endpoint','') || (location.protocol.indexOf('http') === 0 ? defaultEp : '');
   var key = LS.get('apikey','');
