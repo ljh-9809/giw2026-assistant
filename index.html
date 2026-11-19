@@ -1677,6 +1677,23 @@ function capBoot(){
 setInterval(function(){ if (capInWindow() && capLeader()) capBoot(); }, 15000);
 setTimeout(capBoot, 2500);
 
+/* 서버 저장소(블롭)가 막혀 있어서, 수집 안 하는 기기는 레포에 올려둔 사본으로 채운다.
+   ponytail: 사본은 수동 커밋이라 마지막 푸시 시점까지만 따라온다. 실시간이 필요하면 수집 중인 기기에서 봐라. */
+function capSeedFromRepo(){
+  if (capLocalGet('centennial', todayISO()).length > 200) return;  // 이 브라우저가 직접 모으는 중이면 받을 필요 없다
+  fetch('live/caplines.json', { cache: 'no-store' })
+    .then(function(r){ return r.ok ? r.json() : null; })
+    .then(function(j){
+      if (!j) return;
+      Object.keys(j).forEach(function(key){
+        var m = /^(.+)_(\d{4}-\d{2}-\d{2})$/.exec(key);
+        if (m && Array.isArray(j[key]) && j[key].length) capLocalPut(m[1], m[2], j[key]);
+      });
+    })
+    .catch(function(){});
+}
+setTimeout(capSeedFromRepo, 1200);
+
 /* ---------- 강연 기록 ---------- */
 var TRANS = null, TROPEN = null, TRFULL = null;
 function loadTrans(cb){
