@@ -890,6 +890,29 @@ function posterLine(p, withAbs){
   else if (withAbs){ var b = absShort(p.num); if (b) base += '\n  초록 첫머리: ' + b; }
   return base;
 }
+/* 프로그램의 장소 이름 -> 자막 수집 방 id */
+var CAPROOM_OF = {
+  'The Centennial Hall': 'centennial',
+  'B125-126 (Grand Ballroom)': 'grandballroom',
+  'B110 (Choi Young Hall)': 'choiyoung'
+};
+/* 세션 시간대에 해당하는 실시간 자막 줄을 꺼낸다 (브라우저에 쌓인 것) */
+function capLinesFor(s){
+  if (!s || !s.date || !s.time) return null;
+  var room = CAPROOM_OF[s.room || ''];
+  if (!room || typeof capLocalGet !== 'function') return null;
+  var m = /^(\d{1,2}):(\d{2})\s*-\s*(\d{1,2}):(\d{2})/.exec(s.time);
+  if (!m) return null;
+  var all = capLocalGet(room, s.date);
+  if (!all.length) return null;
+  var from = (+m[1]) * 60 + (+m[2]) - 5, to = (+m[3]) * 60 + (+m[4]) + 10;
+  return all.filter(function(l){
+    var p = /^(\d{1,2}):(\d{2})$/.exec(l.t || '');
+    if (!p) return false;
+    var mins = (+p[1]) * 60 + (+p[2]);
+    return mins >= from && mins <= to;
+  });
+}
 function retrieve(q){
   var terms = expand(q);
   var mine = myNums();
@@ -958,6 +981,24 @@ function retrieve(q){
       var body = (bestLines.length ? bestLines : best.lines).slice(0, 25).map(function(l){ return l.t + ' ' + l.s; }).join('\n');
       picked.unshift({ kind:'session', obj:{ id:'tr'+best.id, date:'2026-11-17', time:best.time, room:'B110 (Choi Young Hall)', title:best.title },
         line: head + '\n' + body.slice(0, 2600), url: TRANS.source, label: best.title });
+    }
+  }
+  /* 실제 강연 자막이 있으면 맨 앞에 — 초록보다 정확하고, 초록 없는 플레너리도 답할 수 있다 */
+  var capCand = cand.filter(function(c){ return c.kind === 'session'; })[0];
+  if (capCand){
+    var cl = capLinesFor(capCand.obj);
+    if (cl && cl.length){
+      var ko = cl.filter(function(l){ return l.k === 'ko'; });
+      var use = (ko.length > cl.length * 0.3) ? ko : cl;
+      var step = Math.ceil(use.length / 70) || 1;
+      var sel = use.filter(function(_, i){ return i % step === 0; });
+      var o = capCand.obj;
+      picked.unshift({
+        kind: 'session', obj: o, url: o.url, label: o.title + ' 자막',
+        line: '[실시간 자막 ' + o.date + ' ' + o.time + ' ' + o.title + ' @' + o.room + ']' +
+              ' (AI 자막이라 오인식 가능, 전체 ' + cl.length + '줄 중 발췌)\n' +
+              sel.map(function(l){ return l.t + ' ' + l.s; }).join('\n').slice(0, 5000)
+      });
     }
   }
   var ctx = '', used = [];
