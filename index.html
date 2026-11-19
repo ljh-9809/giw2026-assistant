@@ -1000,7 +1000,7 @@ function retrieve(q){
         kind: 'session', obj: o, url: o.url, label: o.title + ' 자막',
         line: '[실시간 자막 ' + o.date + ' ' + o.time + ' ' + o.title + ' @' + o.room + ']' +
               ' (AI 자막이라 오인식 가능, 전체 ' + cl.length + '줄 중 발췌)\n' +
-              sel.map(function(l){ return l.t + ' ' + l.s; }).join('\n').slice(0, 5000)
+              sel.map(function(l){ return l.t + ' ' + l.s; }).join('\n').slice(0, 2500)
       });
     }
   }
@@ -1014,7 +1014,7 @@ function retrieve(q){
       ctx += (ctx ? '\n\n' : '') + p.line; used.push(p);
     });
   }
-  fill(false, day ? 6000 : 13000);
+  fill(false, day ? 8000 : 13000);
   fill(true, 13000);
   if (!ctx){
     if (LASTCTX){ ctx = LASTCTX; used = LASTUSED.slice(); }
