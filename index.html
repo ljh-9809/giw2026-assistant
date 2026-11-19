@@ -851,11 +851,12 @@ function expand(q){
   raw.forEach(function(w){
     if (/[가-힣]/.test(w)) {
       Object.keys(KO).forEach(function(k){ if (w.indexOf(k) >= 0) out.push(KO[k].toLowerCase()); });
-      (w.match(/[a-z0-9][a-z0-9\-]+/g) || []).forEach(function(lat){ if (lat.length > 1) out.push(lat); });
+      /* 숫자만인 조각("19일"의 19, "17:00"의 17)은 검색어가 아니다 — P019·P119 같은 포스터 번호에 걸려 예산을 다 먹었다 */
+      (w.match(/[a-z0-9][a-z0-9\-]+/g) || []).forEach(function(lat){ if (lat.length > 1 && !/^\d+$/.test(lat)) out.push(lat); });
       var ko = w.replace(/[a-z0-9\-]+/g, '');
       if (ko.length > 1 && !KO_STOP.test(ko)) out.push(ko);
       if (!KO_STOP.test(w) && w.length > 1 && !/[a-z]/.test(w)) out.push(w);
-    } else if (w.length > 1) out.push(w);
+    } else if (w.length > 1 && !/^\d+$/.test(w)) out.push(w);
   });
   return Array.from(new Set(out));
 }
@@ -917,10 +918,10 @@ function retrieve(q){
   var terms = expand(q);
   var mine = myNums();
   var picked = [], seen = {};
-  function push(kind, obj, line, url, label){
+  function push(kind, obj, line, url, label, dayList){
     var key = kind + (kind==='poster' ? obj.num : obj.id);
     if (seen[key]) return; seen[key] = 1;
-    picked.push({ kind:kind, obj:obj, line:line, url:url, label:label });
+    picked.push({ kind:kind, obj:obj, line:line, url:url, label:label, dayList:!!dayList });
   }
   if (/내 포스터|제 포스터|내포스터|my poster/i.test(q) && mine.length){
     P.filter(function(p){ return mine.indexOf(p.num) >= 0; }).forEach(function(p){
@@ -966,7 +967,7 @@ function retrieve(q){
   if (day){
     S.filter(function(s){ return s.date===day && !s.isPoster && !NOISE.test(s.title); })
      .sort(function(a,b){ return a.time.localeCompare(b.time); })
-     .forEach(function(s){ push('session', s, sessionLine(s), s.url, s.title); });
+     .forEach(function(s){ push('session', s, sessionLine(s), s.url, s.title, true); });
   }
   if (TRANS && TRANS.talks && terms.length){
     var best = null, bestLines = null, bestScore = 0;
@@ -1003,11 +1004,18 @@ function retrieve(q){
       });
     }
   }
+  /* 날짜를 물으면 그 날 일정이 답이다. 점수 붙은 것들이 예산을 다 먹어서
+     "19일 세션"이 저녁 두 건만 남은 적이 있다 — 일정 몫을 떼어둔다. */
   var ctx = '', used = [];
-  for (var i=0;i<picked.length;i++){
-    if (ctx.length + picked[i].line.length > 9000) break;
-    ctx += (ctx ? '\n\n' : '') + picked[i].line; used.push(picked[i]);
+  function fill(wantDay, lim){
+    picked.forEach(function(p){
+      if (!!p.dayList !== wantDay) return;
+      if (ctx.length + p.line.length > lim) return;   /* 긴 것 하나에 멈추지 않고 건너뛴다 */
+      ctx += (ctx ? '\n\n' : '') + p.line; used.push(p);
+    });
   }
+  fill(false, day ? 6000 : 13000);
+  fill(true, 13000);
   if (!ctx){
     if (LASTCTX){ ctx = LASTCTX; used = LASTUSED.slice(); }
     else {
@@ -1124,7 +1132,7 @@ function askWith(q){
   }
   function finish(answer, failed){
     BUSY = null; setBusy(false);
-    CHAT.push({ role:'user', content:userMsg });
+    CHAT.push({ role:'user', content:'[질문] ' + q });  /* 데이터 블록은 기록에 남기지 않는다 — 매 질문마다 새로 붙는다 */
     CHAT.push({ role:'assistant', content:answer });
     while (CHAT.length > 12) CHAT.shift();
     bodyEl.classList.remove('thinking');
